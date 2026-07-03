@@ -537,7 +537,7 @@ static void t5577_writer_view_write_callback(Canvas* canvas, void* model) {
         canvas_draw_icon(canvas, 0, 8, &I_NFC_manual_60x50);
         canvas_draw_str_aligned(canvas, 97, 15, AlignCenter, AlignTop, "Writing");
         canvas_draw_str_aligned(canvas, 94, 27, AlignCenter, AlignTop, "Hold card next");
-        canvas_draw_str_aligned(canvas, 93, 39, AlignCenter, AlignTop, "to Flipper's back");
+        canvas_draw_str_aligned(canvas, 93, 39, AlignCenter, AlignTop, "to Kiisu's back");
     } else {
         canvas_set_bitmap_mode(canvas, true);
         canvas_draw_icon(canvas, 0, 9, &I_DolphinSuccess_91x55);

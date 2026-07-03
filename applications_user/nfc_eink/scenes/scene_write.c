@@ -44,7 +44,7 @@ static void nfc_eink_scene_write_show_waiting(const NfcEinkApp* instance) {
     popup_reset(instance->popup);
     popup_set_header(instance->popup, "Waiting", 97, 15, AlignCenter, AlignTop);
     popup_set_text(
-        instance->popup, "Apply eink next\nto Flipper's back", 94, 27, AlignCenter, AlignTop);
+        instance->popup, "Apply eink next\nto Kiisu's back", 94, 27, AlignCenter, AlignTop);
     popup_set_icon(instance->popup, 0, 8, &I_NFC_manual_60x50);
     view_dispatcher_switch_to_view(instance->view_dispatcher, NfcEinkViewPopup);
 }

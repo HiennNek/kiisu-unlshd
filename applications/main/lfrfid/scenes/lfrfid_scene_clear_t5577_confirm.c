@@ -7,7 +7,7 @@ void lfrfid_scene_clear_t5577_confirm_on_enter(void* context) {
     widget_add_button_element(widget, GuiButtonTypeLeft, "Exit", lfrfid_widget_callback, app);
     widget_add_button_element(widget, GuiButtonTypeRight, "Start", lfrfid_widget_callback, app);
     widget_add_string_multiline_element(
-        widget, 64, 22, AlignCenter, AlignBottom, FontPrimary, "Apply tag to\nFlipper's back");
+        widget, 64, 22, AlignCenter, AlignBottom, FontPrimary, "Apply tag to\nKiisu's back");
     widget_add_string_multiline_element(
         widget,
         64,

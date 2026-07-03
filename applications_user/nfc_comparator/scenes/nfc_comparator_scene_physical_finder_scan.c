@@ -38,7 +38,7 @@ bool nfc_comparator_physical_finder_scan_scene_on_event(void* context, SceneMana
             nfc_comparator->views.popup, "Scanning....", 64, 5, AlignCenter, AlignTop);
          popup_set_text(
             nfc_comparator->views.popup,
-            "Hold card next\nto Flipper's back",
+            "Hold card next\nto Kiisu's back",
             64,
             40,
             AlignCenter,

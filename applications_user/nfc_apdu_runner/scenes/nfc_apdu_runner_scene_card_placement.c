@@ -23,7 +23,7 @@ void nfc_apdu_runner_scene_card_placement_on_enter(void* context) {
     // 添加图标 - 使用内置元素
     widget_add_string_element(widget, 64, 5, AlignCenter, AlignTop, FontPrimary, "Place card on");
     widget_add_string_element(
-        widget, 64, 20, AlignCenter, AlignTop, FontPrimary, "the Flipper's back");
+        widget, 64, 20, AlignCenter, AlignTop, FontPrimary, "the Kiisu's back");
 
     // 添加按钮
     widget_add_button_element(
