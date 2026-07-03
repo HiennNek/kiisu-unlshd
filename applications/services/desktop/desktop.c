@@ -553,6 +553,7 @@ int32_t desktop_srv(void* p) {
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneFault);
     }
 
+    /*
     uint8_t keys_total, keys_valid;
     if(!furi_hal_crypto_enclave_verify(&keys_total, &keys_valid)) {
         FURI_LOG_E(
@@ -563,6 +564,7 @@ int32_t desktop_srv(void* p) {
 
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneSecureEnclave);
     }
+    */
 
     // Special case: autostart application is already running
     if(desktop->app_running && animation_manager_is_animation_loaded(desktop->animation_manager)) {

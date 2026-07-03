@@ -1,0 +1,21 @@
+App(
+    appid="dcf77",
+    name="DCF77 Transmitter",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="dcf77_app_main",
+    sources=[
+        "dcf77_app.c",
+        "src/*.c",
+    ],
+    cdefines=["APP_DCF77"],
+    requires=["gui"],
+    stack_size=8 * 1024,
+    order=10,
+    fap_icon="icons/app.png",
+    fap_icon_assets="icons",
+    fap_category="Tools",
+    fap_version="2.0",
+    fap_author="@arha",
+    fap_weburl="https://github.com/arha/flipper-dcf77",
+    fap_description="Radio clock emulator lab with DCF77, MSF, WWVB, JJY and others, plus many debugging features",
+)

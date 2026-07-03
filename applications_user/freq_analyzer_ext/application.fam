@@ -1,0 +1,16 @@
+App(
+    appid="freq_analyzer_ext",
+    name="Frequency Analyzer",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="freq_anal_app",
+    requires=[
+        "gui",
+        "cli",
+        "dialogs",
+    ],
+    stack_size=3 * 1024,
+    fap_libs=["assets", "hwdrivers"],
+    fap_icon="icon.png",
+    fap_category="Sub-GHz",
+)

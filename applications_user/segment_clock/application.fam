@@ -1,0 +1,18 @@
+App(
+    appid="segment_clock",
+    name="Segment Clock",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="clock_app",
+    requires=[
+        "gui",
+        "notification",
+    ],
+    stack_size=2 * 1024,
+    fap_icon="icon.png",
+    fap_category="Tools",
+    fap_author="sergo",
+    fap_version="1.1",
+    fap_weburl="https://github.com/Sladkisnovraper/Segment-Clock-For-Flipper-Zero",
+    fap_description="Display simple segment clock on Flipper screen",
+    sources=["*.c"]
+) 
