@@ -175,7 +175,7 @@ void desktop_settings_scene_start_on_enter(void* context) {
     variable_item_set_current_value_index(item, value_index);
     variable_item_set_current_value_text(item, clock_enable_text[value_index]);
 
-    variable_item_list_add(variable_item_list, "Change Flipper Name", 0, NULL, app);
+    variable_item_list_add(variable_item_list, "Change Kiisu Name", 0, NULL, app);
 
     variable_item_list_add(variable_item_list, "Happy Mode", 1, NULL, NULL);
 
