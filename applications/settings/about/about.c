@@ -23,11 +23,15 @@ static DialogMessageButton product_screen(DialogsApp* dialogs, DialogMessage* me
         furi_hal_version_get_model_name(),
         furi_hal_version_get_model_code());
 
+    /*
     FuriString* screen_text = furi_string_alloc_printf(
         "FCC ID: %s\n"
         "IC: %s",
         furi_hal_version_get_fcc_id(),
         furi_hal_version_get_ic_id());
+    */
+
+    FuriString* screen_text = furi_string_alloc_printf("From Tallinn with love <3");
 
     dialog_message_set_header(
         message, furi_string_get_cstr(screen_header), 0, 0, AlignLeft, AlignTop);
@@ -43,6 +47,7 @@ static DialogMessageButton product_screen(DialogsApp* dialogs, DialogMessage* me
     return result;
 }
 
+/*
 static DialogMessageButton address_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
@@ -71,6 +76,8 @@ static DialogMessageButton compliance_screen(DialogsApp* dialogs, DialogMessage*
 
     return result;
 }
+
+*/
 
 static DialogMessageButton unleashed_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
@@ -194,8 +201,8 @@ const AboutDialogScreen about_screens[] = {
     unleashed_info_screen2,
     unleashed_info_screen3,
     product_screen,
-    compliance_screen,
-    address_screen,
+    // compliance_screen,
+    // address_screen,
     hw_version_screen,
     fw_version_screen};
 
