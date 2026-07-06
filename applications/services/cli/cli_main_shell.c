@@ -8,7 +8,7 @@ void cli_main_motd(void* context) {
     UNUSED(context);
     printf("CONNECT 1500000/NONE\r\n"
            "\r\n" ANSI_FG_BR_WHITE "Welcome to Kiisu Command Line Interface (compatible with Flipper Zero)!\r\n"
-           "Read the manual: https://docs.flipper.net/development/cli\r\n"
+           "Read the manual: https://docs.flipper.net/zero/development/cli\r\n"
            "Run `help` or `?` to list available commands\r\n"
            "Run `!` for info about the device, `power reboot` also useful\r\n"
            "\r\n" ANSI_RESET);
