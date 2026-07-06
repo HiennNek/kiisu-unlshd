@@ -1,7 +1,7 @@
-# Kiisu-MNTM Custom KeeLoq Manufacturer Keys
+# Kiisu-UNLSHD Custom KeeLoq Manufacturer Keys
 # Source:  https://github.com/HiennNek/non-flipper-rolling-code-support/blob/main/keeloq_mfcodes_user
-# Synced at commit: a67610d
-# Covers most manufacturers and protocols supported by upstream Momentum firmware
+# Synced at commit: 868e9e8
+# Covers most manufacturers and protocols supported by upstream Unleashed firmware
 Filetype: Flipper SubGhz Keystore File
 Version: 0
 Encryption: 0
@@ -103,8 +103,6 @@ AC35BB2759000000:7:Magic_3
 AC35BB2759000000:8:Magic_3
 9804655AA5000000:8:Magic_4
 414C455831393830:10:Kingates_Stylo4k
-414C455831393830:1:Kinggates_Stylo4k
-414C455831393830:10:Kinggates_Stylo4k
 F6E5D4B32ABADCFE:1:StarLine_B6
 0132456789ABCDEF:1:Pandora_Test_Debug_2
 1B36977B281597AC:1:Pandora_PRO
@@ -120,3 +118,12 @@ F6E5D4B32ABADCFE:1:StarLine_B6
 207DBBE59D386F44:2:Cardin_S449
 6EB6AE4815C63ED2:9:Beninca_ARC
 27193A9B117C0835:11:Jarolift
+FFFFFFFFFFFFFFFF:1:FFFF_Simple
+FFFFFFFFFFFFFFFF:2:FFFF_Normal
+0000000000000000:1:Zero_Simple
+0000000000000000:2:Zero_Normal
+0123456789ABCDEF:1:Stilmatic
+5504045708301203:2:StarA8A9
+7BCBEED4376EDCBF:2:Sommer
+9BF7F89BF8FE78DA:1:SL_A2-A4
+F6E5D4B32ABADCFE:1:SL_B6,B9_dop
