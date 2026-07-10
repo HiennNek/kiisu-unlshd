@@ -35,7 +35,7 @@ static void show_waiting_popup(NfcApduRunner* app) {
     popup_set_header(popup, "NFC APDU Runner", 64, 0, AlignCenter, AlignTop);
     popup_set_text(
         popup,
-        "Waiting for card...\nPlace card on Kiisu's back",
+        "Waiting for card...\nPlace card on Flipper's back",
         64,
         32,
         AlignCenter,

@@ -54,7 +54,7 @@ void sonicare_scene_read_on_enter(void* context) {
     popup_reset(popup);
     // image is 39px wide, screen is 128px --> 89px left, centre point X: 39 + (89/2) = 83
     popup_set_header(popup, "Reading", 83, 8, AlignCenter, AlignTop);
-    popup_set_text(popup, "Hold brush stem\nnext to\nKiisu's back", 83, 27, AlignCenter, AlignTop);
+    popup_set_text(popup, "Hold brush stem\nnext to\nFlipper's back", 83, 27, AlignCenter, AlignTop);
     popup_set_icon(app->popup, 0, 0, &I_sonicare_read);
     view_dispatcher_switch_to_view(app->view_dispatcher, SonicareViewPopup);
     

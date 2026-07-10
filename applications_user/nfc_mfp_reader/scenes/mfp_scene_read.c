@@ -138,7 +138,7 @@ void mfp_scene_read_on_enter(void* ctx) {
     popup_set_header(app->popup, "Reading", 97, 15, AlignCenter, AlignTop);
     popup_set_text(
         app->popup,
-        "Hold card next\nto Kiisu's back",
+        "Hold card next\nto Flipper's back",
         94, 27, AlignCenter, AlignTop);
     popup_set_icon(app->popup, 0, 8, &I_nfc_manual_60x50);
     view_dispatcher_switch_to_view(app->view_dispatcher, MfpViewPopup);
