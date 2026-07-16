@@ -127,7 +127,7 @@ Weekly. Check the [Releases](https://github.com/HiennNek/kiisu-unlshd/releases) 
 <details>
 <summary><b>What is rolling code support, and why does it matter for Kiisu?</b></summary>
 
-Rolling code is the security scheme used by many garage door openers, gate remotes, and car key fobs, where each transmission uses a new code instead of a static one. Official Flipper firmware needs factory-provisioned keys to handle certain rolling-code protocols - and since Kiisu hardware isn't produced by Flipper Labs, it doesn't ship with those keys. Kiisu-UNLSHD implements its own support so these protocols work on Kiisu anyway.
+Rolling code is the security scheme used by many garage door openers, gate remotes, and car key fobs, where each transmission uses a new code instead of a static one. Official Flipper firmware needs factory-provisioned keys to handle certain rolling-code protocols - and since Kiisu hardware isn't produced by Flipper Devices Inc., it doesn't ship with those keys. Kiisu-UNLSHD implements its own support so these protocols work on Kiisu anyway.
 
 </details>
 
