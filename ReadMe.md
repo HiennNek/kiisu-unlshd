@@ -88,7 +88,7 @@ Try using VirusTotal if you don't trust it.
 <details>
 <summary><b>What is Kiisu-UNLSHD?</b></summary>
 
-Kiisu-UNLSHD is a community-maintained fork of [Unleashed Firmware](https://github.com/DarkFlippers/unleashed-firmware) built specifically for the Kiisu device. It adds rolling code and U2F support that aren't available in official Flipper firmware on Kiisu hardware, ships hand-redrawn Kiisu-branded assets, and stays continuously synced with upstream Unleashed plus the latest Kiisu-specific tweaks and apps.
+Kiisu-UNLSHD is a community-maintained fork of [Unleashed Firmware](https://github.com/DarkFlippers/unleashed-firmware) built specifically for the Kiisu device. It adds rolling code and U2F support that aren't available in official Unleashed firmware, ships hand-redrawn Kiisu-branded assets, and stays continuously synced with upstream Unleashed plus the latest Kiisu-specific tweaks and apps.
 
 </details>
 
