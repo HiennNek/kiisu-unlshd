@@ -48,6 +48,41 @@ Build and launch a single app:
 
 > Don't see your question answered here? [Open an issue](https://github.com/HiennNek/kiisu-unlshd/issues).
 
+### Common issues
+<details>
+<summary><b>Screen glitching after installation</b></summary>
+Just restart your Kiisu.
+</details>
+<details>
+<summary><b>Things broke after switching from other firmware</b></summary>
+
+Delete all files from your SD card (you can still keep captured files/downloaded DB files), then reflash the firmware.
+
+If you can't flash the firmware using the normal way, try flashing it with DFU mode. (Turn off Kiisu, then hold the `OK` button and plug your Kiisu into your PC. qFlipper and lab.flipper.net will recognize it as DFU mode.)
+
+You can find the DFU file in the latest [releases](https://github.com/HiennNek/kiisu-unlshd/releases).
+</details>
+<details>
+<summary><b>Why doesn't U2F work?</b></summary>
+Try deleting all files in <code>SD Card/u2f/</code>. It will regenerate all cert files.
+If it still doesn't work, then you're using an older version of Kiisu that doesn't ship with Kiisu's secret keys.
+</details>
+<details>
+<summary><b>Why can't Sub-GHz copy my remote?</b></summary>
+Your remote might not be supported by the upstream firmware.
+If you believe your remote is supported by upstream, check <a href="https://github.com/HiennNek/non-flipper-rolling-code-support#-missing-keys">non-flipper-rolling-code-support</a>.
+Or <a href="https://github.com/HiennNek/kiisu-unlshd/issues">open an issue</a>.
+</details>
+<details>
+<summary><b>Windows Defender flags the firmware as a virus</b></summary>
+
+~~Use Linux~~
+
+Windows Defender uses AI to scan and detect malware, which might create a false positive.
+
+Try using VirusTotal if you don't trust it.
+</details>
+
 ### General
 
 <details>
@@ -131,29 +166,6 @@ All visuals are Kiisu-branded rather than Flipper-branded, and the original Kiis
 
 Kiisu-UNLSHD brings Unleashed's broader feature set on top of Kiisu, stays actively synced with upstream, and includes the hand-corrected assets - none of which are part of stock Kiisu firmware.
 
-</details>
-
-
-### Common issues
-<details>
-<summary><b>Why doesn't U2F work?</b></summary>
-Try deleting all files in <code>SD Card/u2f/</code>. It will regenerate all cert files.
-If it still doesn't work, then you're using an older version of Kiisu that doesn't ship with Kiisu's secret keys.
-</details>
-<details>
-<summary><b>Why can't Sub-GHz copy my remote?</b></summary>
-Your remote might not be supported by the upstream firmware.
-If you believe your remote is supported by upstream, check <a href="https://github.com/HiennNek/non-flipper-rolling-code-support#-missing-keys">non-flipper-rolling-code-support</a>.
-Or <a href="https://github.com/HiennNek/kiisu-unlshd/issues">open an issue</a>.
-</details>
-<details>
-<summary><b>Windows Defender flags the firmware as a virus</b></summary>
-
-~~Use Linux~~
-
-Windows Defender uses AI to scan and detect malware, which might create a false positive.
-
-Try using VirusTotal if you don't trust it.
 </details>
 
 
