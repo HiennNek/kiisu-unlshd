@@ -26,7 +26,7 @@ git clone --recursive --jobs 8 https://github.com/HiennNek/kiisu-unlshd.git
 cd kiisu-unlshd/
 ```
 
-Flash directly to the Flipper (device must be connected via USB with qFlipper closed):
+Flash directly to Kiisu (device must be connected via USB with qFlipper closed):
 
 ```bash
 ./fbt COMPACT=1 DEBUG=0 flash_usb_full
