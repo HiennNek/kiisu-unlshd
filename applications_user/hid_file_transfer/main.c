@@ -19,19 +19,19 @@
 #include "hidtransfer_icons.h"
 
 #define HEX_VIEWER_APP_PATH_FOLDER "/any"
-#define HEX_VIEWER_APP_EXTENSION "*"
+#define HEX_VIEWER_APP_EXTENSION   "*"
 
-#define HEX_VIEWER_BYTES_PER_LINE 4u
+#define HEX_VIEWER_BYTES_PER_LINE  4u
 #define HEX_VIEWER_LINES_ON_SCREEN 4u
-#define HEX_VIEWER_BUF_SIZE (HEX_VIEWER_LINES_ON_SCREEN * HEX_VIEWER_BYTES_PER_LINE)
+#define HEX_VIEWER_BUF_SIZE        (HEX_VIEWER_LINES_ON_SCREEN * HEX_VIEWER_BYTES_PER_LINE)
 
-#define VIEW_DISPATCHER_MENU 0
-#define VIEW_DISPATCHER_SEND 1
+#define VIEW_DISPATCHER_MENU                 0
+#define VIEW_DISPATCHER_SEND                 1
 #define VIEW_DISPATCHER_SEND_SINGLE_THREADED 3
-#define VIEW_DISPATCHER_RECEIVE 2
-#define VIEW_DISPATCHER_POPUP 3
-#define VIEW_DISPATCHER_DEBUG_SEND 99
-#define VIEW_DISPATCHER_DEBUG_RECEIVE 98
+#define VIEW_DISPATCHER_RECEIVE              2
+#define VIEW_DISPATCHER_POPUP                3
+#define VIEW_DISPATCHER_DEBUG_SEND           99
+#define VIEW_DISPATCHER_DEBUG_RECEIVE        98
 
 typedef struct {
     uint8_t file_bytes[HEX_VIEWER_LINES_ON_SCREEN][HEX_VIEWER_BYTES_PER_LINE];
@@ -155,7 +155,10 @@ static void dataTransferApp_free(DataTransferApp* instance) {
     view_dispatcher_free(instance->view_dispatcher);
     furi_record_close(RECORD_GUI);
 
-    if(instance->model->stream) buffered_file_stream_close(instance->model->stream);
+    if(instance->model->stream) {
+        buffered_file_stream_close(instance->model->stream);
+        stream_free(instance->model->stream);
+    }
 
     free(instance->model);
     free(instance);
@@ -285,7 +288,7 @@ static void dispatch_view(void* contextd, uint32_t index) {
         stopSendingData();
 
         buffered_file_stream_close(fs);
-        free(fs);
+        stream_free(fs);
         furi_string_free(browser_path);
         furi_string_free(selected_path);
         view_dispatcher_switch_to_view(context->view_dispatcher, VIEW_DISPATCHER_MENU);
@@ -357,7 +360,7 @@ static void dispatch_view(void* contextd, uint32_t index) {
         }
 
         buffered_file_stream_close(fs);
-        free(fs);
+        stream_free(fs);
         free((void*)metadataMsg->fileName);
         free(metadataMsg);
         furi_string_free(filePath);

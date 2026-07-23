@@ -6,7 +6,7 @@
 #include <furi_hal_infrared.h>
 #include <gui/gui.h>
 
-#define TAG "IR Scope"
+#define TAG  "IR Scope"
 #define COLS 128
 #define ROWS 8
 
@@ -26,7 +26,8 @@ static void state_set_autoscale(IRScopeState* state) {
 static void canvas_draw_str_outline(Canvas* canvas, int x, int y, const char* str) {
     canvas_set_color(canvas, ColorWhite);
     for(int y1 = -1; y1 <= 1; ++y1)
-        for(int x1 = -1; x1 <= 1; ++x1) canvas_draw_str(canvas, x + x1, y + y1, str);
+        for(int x1 = -1; x1 <= 1; ++x1)
+            canvas_draw_str(canvas, x + x1, y + y1, str);
 
     canvas_set_color(canvas, ColorBlack);
     canvas_draw_str(canvas, x, y, str);
@@ -129,7 +130,7 @@ int32_t ir_scope_app(void* p) {
     view_port_draw_callback_set(view_port, render_callback, &state);
     view_port_input_callback_set(view_port, input_callback, event_queue);
 
-    Gui* gui = furi_record_open("gui");
+    Gui* gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
 
     InfraredWorker* worker = infrared_worker_alloc();
@@ -175,7 +176,7 @@ int32_t ir_scope_app(void* p) {
 
     view_port_enabled_set(view_port, false);
     gui_remove_view_port(gui, view_port);
-    furi_record_close("gui");
+    furi_record_close(RECORD_GUI);
     view_port_free(view_port);
     furi_message_queue_free(event_queue);
     furi_mutex_free(state.mutex);

@@ -78,14 +78,14 @@ static UHFReaderApp* uhf_reader_app_alloc() {
     App->EpcIndexFile = IndexFile;
 
     //Initializing the arrays for storing all tag information from the read screen
-    App->EpcValues = (char**)malloc(150 * 26);
-    App->TidValues = (char**)malloc(150 * 41);
-    App->ResValues = (char**)malloc(150 * 17);
-    App->MemValues = (char**)malloc(150 * 33);
+    App->EpcValues = (char**)malloc(50 * 26);
+    App->TidValues = (char**)malloc(50 * 41);
+    App->ResValues = (char**)malloc(50 * 17);
+    App->MemValues = (char**)malloc(50 * 33);
     App->EpcToSave = (char*)malloc(25);
     App->NumberOfEpcsToRead = 0;
 
-    //Initializing the indices for each array and the file name 
+    //Initializing the indices for each array and the file name
     App->NameSize = 36;
     App->NameSizeParse = 27;
     App->CurEpcIndex = 26;
@@ -93,7 +93,7 @@ static UHFReaderApp* uhf_reader_app_alloc() {
     App->CurResIndex = 1;
     App->CurMemIndex = 1;
     App->FileName = (char*)malloc(App->NameSize);
-    
+
     //Creating the initial GUI
     Gui* Gui = furi_record_open(RECORD_GUI);
     App->ViewDispatcher = view_dispatcher_alloc();
@@ -125,7 +125,7 @@ static UHFReaderApp* uhf_reader_app_alloc() {
     uart_helper_set_baud_rate(App->UartHelper, DEVICE_BAUDRATE);
     uart_helper_set_delimiter(App->UartHelper, LINE_DELIMITER, INCLUDE_LINE_DELIMITER);
     uart_helper_set_callback(App->UartHelper, uart_demo_process_line, App);
-    
+
     return App;
 }
 
@@ -142,21 +142,18 @@ static void uhf_reader_app_free(UHFReaderApp* App) {
     furi_record_close(RECORD_NOTIFICATION);
     furi_record_close(RECORD_STORAGE);
     furi_record_close(RECORD_GUI);
-    
+
     //Freeing the UART helper
-    if(App->UHFModuleType != YRM100X_MODULE){
+    if(App->UHFModuleType != YRM100X_MODULE) {
         uart_helper_free(App->UartHelper);
-    }
-    else{
+    } else {
         //Free Tag Wrapper
         uhf_tag_wrapper_free(App->YRM100XWorker->uhf_tag_wrapper);
 
-        //Freeing yrm100x worker 
+        //Freeing yrm100x worker
         uhf_worker_stop(App->YRM100XWorker);
         uhf_worker_free(App->YRM100XWorker);
     }
-    
-    
 
     //Freeing all views, widgets, and menus
     view_delete_free(App);
@@ -171,11 +168,15 @@ static void uhf_reader_app_free(UHFReaderApp* App) {
     view_tag_actions_free(App);
     view_lock_free(App);
     view_kill_free(App);
-    
+
     //Freeing the main menu view
     view_dispatcher_remove_view(App->ViewDispatcher, UHFReaderViewSubmenu);
     submenu_free(App->Submenu);
     view_dispatcher_free(App->ViewDispatcher);
+
+    //Freeing the flipper format files
+    flipper_format_free(App->EpcFile);
+    flipper_format_free(App->EpcIndexFile);
 
     //Freeing variables used in app
     furi_string_free(App->EpcName);
@@ -200,14 +201,14 @@ int32_t main_uhf_reader_app(void* _p) {
     UNUSED(_p);
     Expansion* expansion = furi_record_open(RECORD_EXPANSION);
     expansion_disable(expansion);
-    
+
     bool PowerOn = false;
-    
+
     if(!furi_hal_power_is_otg_enabled()) {
         furi_hal_power_enable_otg();
         PowerOn = true;
     }
-    
+
     UHFReaderApp* App = uhf_reader_app_alloc();
     view_dispatcher_run(App->ViewDispatcher);
 

@@ -7,11 +7,11 @@
 #include <furi.h>
 #include <string.h>
 
-#define NUM_DIGITS  16
-#define CHAR_W      6
-#define GROUP_SIZE  4
-#define GROUP_GAP   5
-#define PREFIX_W    10
+#define NUM_DIGITS 16
+#define CHAR_W     6
+#define GROUP_SIZE 4
+#define GROUP_GAP  5
+#define PREFIX_W   10
 
 typedef struct {
     char prefix;
@@ -43,7 +43,7 @@ static void numlock_draw(Canvas* canvas, void* model_v) {
     int frame_y = 19;
     int frame_h = 24;
     canvas_draw_rframe(canvas, 1, frame_y, 126, frame_h, 2);
-    canvas_draw_line(canvas, 2, frame_y+1, 125, frame_y+1);
+    canvas_draw_line(canvas, 2, frame_y + 1, 125, frame_y + 1);
 
     const uint8_t baseline = 36;
     canvas_set_font(canvas, FontPrimary);
@@ -145,8 +145,7 @@ static bool numlock_input(InputEvent* input, void* ctx) {
                 for(uint8_t i = 0; i < NUM_DIGITS; i++)
                     barcode[1 + i] = '0' + m->digits[i];
                 barcode[17] = '\0';
-                if(numlock->callback)
-                    numlock->callback(numlock->callback_ctx, barcode);
+                if(numlock->callback) numlock->callback(numlock->callback_ctx, barcode);
                 consumed = true;
                 break;
             }
@@ -173,10 +172,10 @@ NumlockInput* numlock_input_alloc(void) {
         numlock->view,
         NumlockModel * m,
         {
-            m->prefix = 'N';
+            m->prefix = 'A';
             memset(m->digits, 0, NUM_DIGITS);
-            m->digits[0] = 4;
-            m->cursor = 1;
+            m->digits[0] = 0;
+            m->cursor = 0;
         },
         true);
 
@@ -202,10 +201,10 @@ void numlock_input_reset(NumlockInput* numlock) {
         numlock->view,
         NumlockModel * m,
         {
-            m->prefix = 'N';
+            m->prefix = 'A';
             memset(m->digits, 0, NUM_DIGITS);
-            m->digits[0] = 4;
-            m->cursor = 1;
+            m->digits[0] = 0;
+            m->cursor = 0;
         },
         true);
 }

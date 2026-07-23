@@ -29,7 +29,7 @@ UART_TerminalApp* uart_terminal_app_alloc() {
 
     app->view_dispatcher = view_dispatcher_alloc();
     app->scene_manager = scene_manager_alloc(&uart_terminal_scene_handlers, app);
-    
+
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
 
     view_dispatcher_set_custom_event_callback(
@@ -75,6 +75,7 @@ void uart_terminal_app_free(UART_TerminalApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, UART_TerminalAppViewVarItemList);
     view_dispatcher_remove_view(app->view_dispatcher, UART_TerminalAppViewConsoleOutput);
     view_dispatcher_remove_view(app->view_dispatcher, UART_TerminalAppViewTextInput);
+    variable_item_list_free(app->var_item_list);
     text_box_free(app->text_box);
     furi_string_free(app->text_box_store);
     uart_text_input_free(app->text_input);

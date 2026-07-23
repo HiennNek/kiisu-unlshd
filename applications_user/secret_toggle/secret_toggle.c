@@ -14,10 +14,10 @@
 #include <stdlib.h>
 #include "util.h"
 
-#define BOARD_HEIGHT 7
-#define BOARD_WIDTH 7
+#define BOARD_HEIGHT      7
+#define BOARD_WIDTH       7
 #define BOARD_NUM_SQUARES (BOARD_HEIGHT * BOARD_WIDTH)
-#define MAX_LEVELS 10
+#define MAX_LEVELS        10
 
 typedef enum {
     EventTypeTick,
@@ -29,7 +29,10 @@ typedef struct {
     InputEvent input;
 } PluginEvent;
 
-typedef enum { SquareActiveOff, SquareActiveOn } SquareActive;
+typedef enum {
+    SquareActiveOff,
+    SquareActiveOn
+} SquareActive;
 
 typedef struct {
     SquareActive mySquareActive;
@@ -269,7 +272,7 @@ int32_t secret_toggle_app(void* p) {
         gameSetup(newGame, tempLevel);
         showLevelScreen(newGame);
         FuriMessageQueue* newFuriMessageQueue = furi_message_queue_alloc(8, sizeof(PluginEvent));
-        Gui* newGui = furi_record_open("gui");
+        Gui* newGui = furi_record_open(RECORD_GUI);
         ViewPort* newViewPort = view_port_alloc();
         view_port_draw_callback_set(newViewPort, render_callback, newGame);
         view_port_input_callback_set(newViewPort, input_callback, newFuriMessageQueue);
@@ -352,7 +355,7 @@ int32_t secret_toggle_app(void* p) {
         view_port_enabled_set(newViewPort, false);
         gui_remove_view_port(newGui, newViewPort);
         view_port_free(newViewPort);
-        furi_record_close("gui");
+        furi_record_close(RECORD_GUI);
         furi_message_queue_free(newFuriMessageQueue);
     }
     showExitScreen(newGame);

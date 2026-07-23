@@ -116,7 +116,6 @@ FlipBip* flipbip_app_alloc() {
 
     // Scene additions
     app->view_dispatcher = view_dispatcher_alloc();
-    
 
     app->scene_manager = scene_manager_alloc(&flipbip_scene_handlers, app);
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
@@ -199,6 +198,7 @@ void flipbip_app_free(FlipBip* app) {
     view_dispatcher_remove_view(app->view_dispatcher, FlipBipViewIdSettings);
     view_dispatcher_remove_view(app->view_dispatcher, FlipBipViewIdTextInput);
     submenu_free(app->submenu);
+    variable_item_list_free(app->variable_item_list);
 
     view_dispatcher_remove_view(app->view_dispatcher, FlipBipViewRenewConfirm);
     dialog_ex_free(app->renew_dialog);

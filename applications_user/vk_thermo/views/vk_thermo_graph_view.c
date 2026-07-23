@@ -7,10 +7,10 @@
 #include <math.h>
 
 // Graph area dimensions
-#define GRAPH_LEFT 28
-#define GRAPH_TOP 12
-#define GRAPH_WIDTH 92
-#define GRAPH_HEIGHT 36
+#define GRAPH_LEFT      28
+#define GRAPH_TOP       12
+#define GRAPH_WIDTH     92
+#define GRAPH_HEIGHT    36
 #define MAX_UNIQUE_UIDS 10
 
 typedef enum {
@@ -90,6 +90,7 @@ static void build_uid_list(VkThermoGraphViewModel* model) {
 }
 
 // Get entries for a specific UID
+// Note: temperature_celsius contains the average temperature for dual-sensor devices (Temptress)
 static uint8_t get_entries_for_uid(
     VkThermoGraphViewModel* model,
     const uint8_t* uid,
@@ -107,6 +108,8 @@ static uint8_t get_entries_for_uid(
         if(!entry->valid) continue;
         if(!uids_equal(entry->uid, uid)) continue;
 
+        // For dual-sensor devices (Temptress), temperature_celsius contains the average
+        // TODO: In comparison mode, could show both sensor lines using temperature2_celsius
         if(model->temp_unit == VkThermoTempUnitFahrenheit) {
             temps[count] = vk_thermo_celsius_to_fahrenheit(entry->temperature_celsius);
         } else if(model->temp_unit == VkThermoTempUnitKelvin) {
@@ -309,6 +312,7 @@ static void vk_thermo_graph_view_draw(Canvas* canvas, VkThermoGraphViewModel* mo
 
     if(model->comparison_mode) {
         // Comparison mode header
+        // TODO: Future enhancement - show dual sensor lines for Temptress devices
         char header_str[24];
         snprintf(header_str, sizeof(header_str), "Compare (%d)", model->uid_count);
         canvas_draw_str(canvas, 0, 8, header_str);
@@ -521,10 +525,7 @@ void vk_thermo_graph_view_set_log(VkThermoGraphView* instance, VkThermoLog* log)
 void vk_thermo_graph_view_set_temp_unit(VkThermoGraphView* instance, uint32_t temp_unit) {
     furi_assert(instance);
     with_view_model(
-        instance->view,
-        VkThermoGraphViewModel * model,
-        { model->temp_unit = temp_unit; },
-        true);
+        instance->view, VkThermoGraphViewModel * model, { model->temp_unit = temp_unit; }, true);
 }
 
 void vk_thermo_graph_view_cycle_thermo(VkThermoGraphView* instance, bool forward) {

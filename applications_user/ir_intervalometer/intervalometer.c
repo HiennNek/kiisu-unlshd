@@ -163,20 +163,15 @@ static int nikon_ir_trigger_send(void* ctx) {
     return 0;
 }
 
-uint32_t pentax_ir_timings[] = {
-    13044, 3057, 965, 1023, 967, 1022, 968, 1023, 
-    990, 1053, 966, 1023, 967, 1024, 989
-};
+uint32_t pentax_ir_timings[] =
+    {13044, 3057, 965, 1023, 967, 1022, 968, 1023, 990, 1053, 966, 1023, 967, 1024, 989};
 static int pentax_ir_trigger_send(void* ctx) {
     UNUSED(ctx);
     infrared_send_raw_ext(pentax_ir_timings, 15, true, 38000, 0.33);
     return 0;
 }
 
-struct flipvalo_trigger sony_ir_trigger = {
-    .send = sony_ir_trigger_send,
-    .display_name = "Sony IR"
-};
+struct flipvalo_trigger sony_ir_trigger = {.send = sony_ir_trigger_send, .display_name = "Sony IR"};
 
 struct flipvalo_trigger canon_ir_trigger = {
     .send = canon_ir_trigger_send,
@@ -188,21 +183,18 @@ struct flipvalo_trigger nikon_ir_trigger = {
 
 struct flipvalo_trigger pentax_ir_trigger = {
     .send = pentax_ir_trigger_send,
-    .display_name = "Pentax IR"
-};
+    .display_name = "Pentax IR"};
 
-static struct flipvalo_trigger* flipvalo_get_trigger(
-        enum flipvalo_trigger_variants variant
-) {
-    switch (variant) {
-        case FvTrigSony:
-            return &sony_ir_trigger;
-        case FvTrigCanon:
-            return &canon_ir_trigger;
-        case FvTrigNikon:
-            return &nikon_ir_trigger;
-        case FvTrigPentax:
-            return &pentax_ir_trigger; 
+static struct flipvalo_trigger* flipvalo_get_trigger(enum flipvalo_trigger_variants variant) {
+    switch(variant) {
+    case FvTrigSony:
+        return &sony_ir_trigger;
+    case FvTrigCanon:
+        return &canon_ir_trigger;
+    case FvTrigNikon:
+        return &nikon_ir_trigger;
+    case FvTrigPentax:
+        return &pentax_ir_trigger;
     }
     return NULL;
 }
@@ -693,7 +685,7 @@ int32_t flipvalo_app() {
     fv_priv->timer = furi_timer_alloc(timer_callback, FuriTimerTypePeriodic, fv_priv);
     furi_timer_start(
         fv_priv->timer, (uint32_t)furi_kernel_get_tick_frequency() / fv_priv->config.tickrate);
-    gui = furi_record_open("gui");
+    gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
 
     while(true) {
@@ -772,7 +764,7 @@ cleanup:
         view_port_enabled_set(view_port, false);
         if(gui) {
             gui_remove_view_port(gui, view_port);
-            furi_record_close("gui");
+            furi_record_close(RECORD_GUI);
         }
         view_port_free(view_port);
     }

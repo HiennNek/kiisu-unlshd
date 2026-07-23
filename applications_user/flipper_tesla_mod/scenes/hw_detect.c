@@ -9,9 +9,19 @@ static int32_t hw_detect_worker(void* context) {
     MCP2515* mcp = app->mcp_can;
     CANFRAME frame;
 
-    mcp->mode = MCP_NORMAL;
+    mcp->mode = MCP_LISTENONLY;
     mcp->bitRate = MCP_500KBPS;
-    mcp->clck = MCP_16MHZ;
+    switch(app->mcp_clock) {
+    case 1:
+        mcp->clck = MCP_8MHZ;
+        break;
+    case 2:
+        mcp->clck = MCP_12MHZ;
+        break;
+    default:
+        mcp->clck = MCP_16MHZ;
+        break;
+    }
 
     if(mcp2515_init(mcp) != ERROR_OK) {
         view_dispatcher_send_custom_event(app->view_dispatcher, TeslaFSDEventNoDevice);
@@ -47,7 +57,8 @@ static int32_t hw_detect_worker(void* context) {
                     furi_mutex_release(app->mutex);
 
                     deinit_mcp2515(mcp);
-                    view_dispatcher_send_custom_event(app->view_dispatcher, TeslaFSDEventHWDetected);
+                    view_dispatcher_send_custom_event(
+                        app->view_dispatcher, TeslaFSDEventHWDetected);
                     return 0;
                 }
             }
@@ -65,15 +76,19 @@ void tesla_fsd_scene_hw_detect_on_enter(void* context) {
 
     widget_reset(app->widget);
     widget_add_string_multiline_element(
-        app->widget, 64, 20, AlignCenter, AlignCenter, FontPrimary,
-        "Detecting HW...");
+        app->widget, 64, 20, AlignCenter, AlignCenter, FontPrimary, "Detecting HW...");
     widget_add_string_multiline_element(
-        app->widget, 64, 40, AlignCenter, AlignCenter, FontSecondary,
+        app->widget,
+        64,
+        40,
+        AlignCenter,
+        AlignCenter,
+        FontSecondary,
         "Listening for\nGTW_carConfig (0x398)");
 
     view_dispatcher_switch_to_view(app->view_dispatcher, TeslaFSDViewWidget);
 
-    app->worker_thread = furi_thread_alloc_ex("TeslaHWDetect", 2048, hw_detect_worker, app);
+    app->worker_thread = furi_thread_alloc_ex("TeslaHWDetect", 4096, hw_detect_worker, app);
     furi_thread_start(app->worker_thread);
 }
 
@@ -90,17 +105,26 @@ bool tesla_fsd_scene_hw_detect_on_event(void* context, SceneManagerEvent event) 
         case TeslaFSDEventHWNotFound:
             widget_reset(app->widget);
             widget_add_string_multiline_element(
-                app->widget, 64, 20, AlignCenter, AlignCenter, FontPrimary,
-                "HW Not Detected");
+                app->widget, 64, 20, AlignCenter, AlignCenter, FontPrimary, "HW Not Detected");
             widget_add_string_multiline_element(
-                app->widget, 64, 44, AlignCenter, AlignCenter, FontSecondary,
+                app->widget,
+                64,
+                44,
+                AlignCenter,
+                AlignCenter,
+                FontSecondary,
                 "Go back and\nselect manually");
             consumed = true;
             break;
         case TeslaFSDEventNoDevice:
             widget_reset(app->widget);
             widget_add_string_multiline_element(
-                app->widget, 64, 28, AlignCenter, AlignCenter, FontPrimary,
+                app->widget,
+                64,
+                28,
+                AlignCenter,
+                AlignCenter,
+                FontPrimary,
                 "CAN Module\nNot Found");
             consumed = true;
             break;

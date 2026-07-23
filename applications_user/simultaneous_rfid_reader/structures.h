@@ -115,11 +115,17 @@ static const NotificationSequence uhf_sequence_blink_start_cyan = {
     NULL,
 };
 
-//LED blinking notification sequence for stopping 
+//LED blinking notification sequence for stopping
 static const NotificationSequence uhf_sequence_blink_stop = {
     &message_blink_stop,
     NULL,
 };
+
+//Structure to track the state of a variable item in a list and if it is locked
+typedef struct VariableItemLock {
+    bool locked;
+} VariableItemLock;
+
 //The main UHFReaderApp Struct
 typedef struct {
     ViewDispatcher* ViewDispatcher;
@@ -130,7 +136,7 @@ typedef struct {
     Submenu* SubmenuTagActions;
     Submenu* SubmenuLockActions;
     Submenu* SubmenuKillActions;
-    
+
     TextInput* TextInput;
     ByteInput* ApInput;
     ByteInput* KillInput;
@@ -140,7 +146,7 @@ typedef struct {
     TextInput* SaveInput;
     TextInput* RenameInput;
     TextInput* EpcWrite;
-    
+
     Popup* LockPopup;
 
     VariableItemList* VariableItemListConfig;
@@ -150,6 +156,11 @@ typedef struct {
     VariableItem* SettingLockApPwdItem;
     VariableItem* SettingLockResultItem;
     VariableItem* WriteSettingApPwdItem;
+    VariableItem* ModuleSelectionItem;
+    VariableItem* SavingSelectionItem;
+    VariableItem* BaudSelection;
+    VariableItem* RegionSelection;
+    VariableItem* AntennaSelection;
     Widget* WidgetAbout;
 
     View* ViewRead;
@@ -251,15 +262,14 @@ typedef struct {
     uint8_t SettingRegionValues[5];
     uint8_t UHFModuleType;
     uint8_t UHFRegionType;
-    
 
     char** EpcValues;
     char** TidValues;
     char** ResValues;
     char** MemValues;
-    
+
     UHFWorker* YRM100XWorker;
-    
+
     char* ReadAccessPasswordLabel;
     char* AccessPasswordPlaceHolder;
     char* DefaultAccessPassword;
@@ -276,7 +286,7 @@ typedef struct {
     BankType DefaultLockBank;
     LockType DefaultLockType;
 
-    //Buffers for YRM100 functionality 
+    //Buffers for YRM100 functionality
     size_t EpcBytesLen;
     size_t ResBytesLen;
     size_t TidBytesLen;
@@ -284,11 +294,15 @@ typedef struct {
     size_t PcBytesLen;
     size_t CrcBytesLen;
     uint8_t* EpcBytes;
-    uint8_t* ResBytes; 
+    uint8_t* ResBytes;
     uint8_t* TidBytes;
     uint8_t* UserBytes;
     uint16_t* PcBytes;
     uint16_t* CrcBytes;
+
+    // Add tracking for locked items
+    VariableItemLock* item_locks;
+    size_t num_items;
 } UHFReaderApp;
 
 //The model for the configure/read screen
@@ -296,7 +310,7 @@ typedef struct {
     uint32_t Setting1Index;
     FuriString* Setting2Power;
     FuriString* SettingReadAp;
-    
+
     uint32_t Setting3Index;
     bool IsReading;
     FuriString* EpcName;
@@ -309,6 +323,7 @@ typedef struct {
     FuriString* Crc;
     uint32_t ScrollOffset;
     char* ScrollingText;
+    bool IsScrolling;
 } UHFReaderConfigModel;
 
 //Model for the write screen

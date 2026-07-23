@@ -23,8 +23,9 @@
 #include <flipper_format/flipper_format_i.h>
 #include "fuzzer_icons.h"
 
-#define FUZZ_TIME_DELAY_MAX (80)
-#define KEY_NAME_SIZE 24
+// Time delay / emu time are stored in 10ms units (1 = 0.01s), displayed as X.XX
+#define FUZZ_TIME_DELAY_MAX (800)
+#define KEY_NAME_SIZE       24
 
 typedef struct {
     const char* custom_dict_extension;

@@ -8,6 +8,7 @@
 #include <input/input.h>
 
 #include <new>
+#include <stdio.h>
 #include <string.h>
 
 namespace flipcraft {
@@ -17,7 +18,15 @@ static void delayMs(uint32_t ms) {
     furi_delay_ms(ms);
 }
 
-enum KeyIndex { B_UP = 0, B_DOWN, B_LEFT, B_RIGHT, B_OK, B_BACK, KEY_COUNT };
+enum KeyIndex {
+    B_UP = 0,
+    B_DOWN,
+    B_LEFT,
+    B_RIGHT,
+    B_OK,
+    B_BACK,
+    KEY_COUNT
+};
 
 static constexpr uint8_t kUp = 1u << B_UP;
 static constexpr uint8_t kDown = 1u << B_DOWN;
@@ -35,13 +44,14 @@ static constexpr uint32_t GAME_TICK_MS = 80;
 
 struct AppState {
     Game* game = nullptr;
-    FuriMutex* mutex = nullptr;    
+    FuriMutex* mutex = nullptr;
     FuriMutex* inputMutex = nullptr;
     ViewPort* view_port = nullptr;
 
     uint8_t present[SCREEN_WIDTH * SCREEN_HEIGHT / 8] = {};
     ScreenId presentScreen = SCR_PLAY;
-    const char* presentName = nullptr;
+    char presentLabel[24] = {};
+    int presentLX = 0, presentLY = 0; // cursor cell anchor for the GUI tooltip
 
     uint8_t held = 0;
     uint8_t pressLatch = 0;
@@ -74,25 +84,41 @@ static void packFramebuffer(const Framebuffer& fb, uint8_t* dst) {
         uint8_t* out = dst + page * SCREEN_WIDTH;
         for(int col = 0; col < SCREEN_WIDTH; ++col) {
             out[col] = static_cast<uint8_t>(
-                (r0[col] & 1)        | ((r1[col] & 1) << 1) |
-                ((r2[col] & 1) << 2) | ((r3[col] & 1) << 3) |
-                ((r4[col] & 1) << 4) | ((r5[col] & 1) << 5) |
+                (r0[col] & 1) | ((r1[col] & 1) << 1) | ((r2[col] & 1) << 2) |
+                ((r3[col] & 1) << 3) | ((r4[col] & 1) << 4) | ((r5[col] & 1) << 5) |
                 ((r6[col] & 1) << 6) | ((r7[col] & 1) << 7));
         }
     }
 }
 
 // Game thread, after a finished render: publish the packed frame and the
-// overlay snapshot. The only writer of present[]/presentScreen/presentName.
+// overlay snapshot. The only writer of present[]/presentScreen/presentLabel.
 static void presentFrame(AppState* st) {
     Game* g = st->game;
-    const char* name = (g->screenId == SCR_PLAY && g->hudItemTicks) ?
-                           itemName(g->pl.inventory[g->pl.invSlot].type) :
-                           nullptr;
+    char label[sizeof(st->presentLabel)];
+    label[0] = 0;
+    int lx = 0, ly = 0;
+    if(g->screenId == SCR_PLAY) {
+        if(g->hudItemTicks) {
+            const char* n = itemName(g->pl.inventory[g->pl.invSlot].type);
+            if(n) snprintf(label, sizeof(label), "%s", n);
+        }
+    } else if(g->screenId != SCR_GAMEOVER) {
+        ItemCell c = g->guiCursorItem(&lx, &ly);
+        const char* n = itemName(c.type);
+        if(n) {
+            if(c.type < ITEM_NONSTACKABLE && c.count > 1)
+                snprintf(label, sizeof(label), "%s x%u", n, (unsigned)c.count);
+            else
+                snprintf(label, sizeof(label), "%s", n);
+        }
+    }
     furi_mutex_acquire(st->mutex, FuriWaitForever);
     packFramebuffer(g->fb, st->present);
     st->presentScreen = g->screenId;
-    st->presentName = name; // itemName returns static strings, the pointer is stable
+    memcpy(st->presentLabel, label, sizeof(label));
+    st->presentLX = lx;
+    st->presentLY = ly;
     furi_mutex_release(st->mutex);
 }
 
@@ -107,7 +133,9 @@ static void drawCb(Canvas* canvas, void* ctx) {
     uint8_t* buf = canvas_get_buffer(canvas);
     if(buf) memcpy(buf, st->present, sizeof(st->present));
     ScreenId screen = st->presentScreen;
-    const char* name = st->presentName;
+    char label[sizeof(st->presentLabel)];
+    memcpy(label, st->presentLabel, sizeof(label));
+    int lx = st->presentLX, ly = st->presentLY;
     furi_mutex_release(st->mutex);
 
     if(screen == SCR_GAMEOVER) {
@@ -118,27 +146,44 @@ static void drawCb(Canvas* canvas, void* ctx) {
         canvas_draw_str_aligned(canvas, 64, 44, AlignCenter, AlignBottom, "Press OK to respawn");
     }
 
-    if(name) {
+    if(label[0]) {
         canvas_set_font(canvas, FontSecondary);
-        int bw = (int)canvas_string_width(canvas, name) + 6, bh = 11;
-        int bx = 64 - bw / 2, by = 40;
+        int bw = (int)canvas_string_width(canvas, label) + 6, bh = 11;
+        int bx, by;
+        if(screen == SCR_PLAY) {
+            bx = 64 - bw / 2;
+            by = 40;
+        } else { // float next to the cursor cell, above it when possible
+            by = ly - bh - 2;
+            if(by < 0) by = ly + 12;
+            bx = lx + 4 - bw / 2;
+            if(bx < 1) bx = 1;
+            if(bx > SCREEN_WIDTH - bw - 1) bx = SCREEN_WIDTH - bw - 1;
+        }
         canvas_set_color(canvas, ColorWhite);
         canvas_draw_box(canvas, bx, by, bw, bh);
         canvas_set_color(canvas, ColorBlack);
         canvas_draw_frame(canvas, bx, by, bw, bh);
-        canvas_draw_str_aligned(canvas, 64, by + bh - 2, AlignCenter, AlignBottom, name);
+        canvas_draw_str_aligned(canvas, bx + bw / 2, by + bh - 2, AlignCenter, AlignBottom, label);
     }
 }
 
 static int keyIndex(InputKey key) {
     switch(key) {
-    case InputKeyUp: return B_UP;
-    case InputKeyDown: return B_DOWN;
-    case InputKeyLeft: return B_LEFT;
-    case InputKeyRight: return B_RIGHT;
-    case InputKeyOk: return B_OK;
-    case InputKeyBack: return B_BACK;
-    default: return -1;
+    case InputKeyUp:
+        return B_UP;
+    case InputKeyDown:
+        return B_DOWN;
+    case InputKeyLeft:
+        return B_LEFT;
+    case InputKeyRight:
+        return B_RIGHT;
+    case InputKeyOk:
+        return B_OK;
+    case InputKeyBack:
+        return B_BACK;
+    default:
+        return -1;
     }
 }
 
@@ -246,7 +291,8 @@ static Input pollInput(AppState* st) {
             if(held & kDown) in.forward = -8;
             if(held & kLeft) in.turn = 1;
             if(held & kRight) in.turn = -1;
-            for(int i = 0; i < 4; ++i) st->dirNextRepeat[i] = 0;
+            for(int i = 0; i < 4; ++i)
+                st->dirNextRepeat[i] = 0;
         }
 
         if(okHeld && !st->okConsumed && !st->okLongFired &&

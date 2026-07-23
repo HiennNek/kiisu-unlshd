@@ -9,6 +9,7 @@
 #include <gui/modules/dialog_ex.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/file_browser.h>
+#include <gui/modules/widget.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <input/input.h>
@@ -38,13 +39,13 @@ struct FlipperShareApp {
     FileBrowser* file_browser;
     DialogEx* dialog_show_file;
     DialogEx* dialog_receive;
-    DialogEx* dialog_about;
+    Widget* widget_about;
 
     FuriString* result_path;
     char selected_file_path[256];
     size_t selected_file_size;
     bool file_info_loaded;
-    
+
     void* file_reading_state;
     FuriTimer* timer;
 };

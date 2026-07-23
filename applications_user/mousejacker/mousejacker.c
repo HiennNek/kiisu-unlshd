@@ -13,12 +13,12 @@
 #include "mousejacker_ducky.h"
 #include <nrf24_mouse_jacker_icons.h>
 
-#define TAG "mousejacker"
-#define LOGITECH_MAX_CHANNEL 85
+#define TAG                                "mousejacker"
+#define LOGITECH_MAX_CHANNEL               85
 #define NRFSNIFF_APP_PATH_FOLDER_ADDRESSES EXT_PATH("apps_data/nrf24_sniffer/addresses.txt")
-#define LOCAL_BADUSB_FOLDER EXT_PATH("badusb")
-#define MOUSEJACKER_APP_PATH_EXTENSION ".txt"
-#define MAX_ADDRS 100
+#define LOCAL_BADUSB_FOLDER                EXT_PATH("badusb")
+#define MOUSEJACKER_APP_PATH_EXTENSION     ".txt"
+#define MAX_ADDRS                          100
 
 typedef enum {
     EventTypeTick,
@@ -112,7 +112,7 @@ static void hexlify(uint8_t* in, uint8_t size, char* out) {
 }
 
 static bool open_ducky_script(Stream* stream, PluginState* plugin_state) {
-    DialogsApp* dialogs = furi_record_open("dialogs");
+    DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
     bool result = false;
     FuriString* path;
     path = furi_string_alloc();
@@ -125,7 +125,7 @@ static bool open_ducky_script(Stream* stream, PluginState* plugin_state) {
 
     bool ret = dialog_file_browser_show(dialogs, path, path, &browser_options);
 
-    furi_record_close("dialogs");
+    furi_record_close(RECORD_DIALOGS);
     if(ret) {
         if(!file_stream_open(stream, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
             FURI_LOG_D(TAG, "Cannot open file \"%s\"", furi_string_get_cstr(path));
@@ -319,7 +319,7 @@ int32_t mousejacker_app(void* p) {
         furi_hal_power_enable_otg();
         furi_delay_ms(10);
     }
-    
+
     nrf24_init();
 
     PluginEvent event;
@@ -377,7 +377,6 @@ int32_t mousejacker_app(void* p) {
                 }
             }
         }
-
 
         furi_mutex_release(plugin_state->mutex);
         view_port_update(view_port);
