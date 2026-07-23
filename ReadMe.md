@@ -58,7 +58,7 @@ Just restart your Kiisu.
 
 Delete all files from your SD card (you can still keep captured files/downloaded DB files), then reflash the firmware.
 
-If you can't flash the firmware using the normal way, try flashing it with DFU mode. (Turn off Kiisu, then hold the `OK` button and plug your Kiisu into your PC. qFlipper and lab.flipper.net will recognize it as DFU mode.)
+If you can't flash the firmware using the normal way, try flashing it in DFU mode. (Turn off Kiisu, then hold the `OK` button and plug your Kiisu into your PC. qFlipper and lab.flipper.net will recognize it as DFU mode.)
 
 You can find the DFU file in the latest [releases](https://github.com/HiennNek/kiisu-unlshd/releases).
 </details>
