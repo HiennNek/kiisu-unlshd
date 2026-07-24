@@ -13,7 +13,7 @@
 
 ## How to install
 
-1. Download **`flipper-z-f7-update-local.tgz`** from [Releases](https://github.com/HiennNek/kiisu-unlshd/releases)
+1. Download **`kiisu-unlshd_XXXXXXXX_dd-MM-yyyy.tgz`** from [Releases](https://github.com/HiennNek/kiisu-unlshd/releases)
 2. Open **qFlipper** or visit [lab.flipper.net](https://lab.flipper.net/)
 3. Select **Install from file** and choose the downloaded file
 
@@ -69,7 +69,7 @@ If it still doesn't work, then you're using an older version of Kiisu that doesn
 </details>
 <details>
 <summary><b>Why can't Sub-GHz copy my remote?</b></summary>
-Your remote might not be supported by the upstream firmware.
+The upstream firmware might not support your remote.
 If you believe your remote is supported by upstream, check <a href="https://github.com/HiennNek/non-flipper-rolling-code-support#-missing-keys">non-flipper-rolling-code-support</a>.
 Or <a href="https://github.com/HiennNek/kiisu-unlshd/issues">open an issue</a>.
 </details>
@@ -148,7 +148,7 @@ You can contribute the missing manufacturer key at the companion repo: [non-flip
 <details>
 <summary><b>What is U2F, and why didn't it work before?</b></summary>
 
-U2F (Universal 2nd Factor) is a hardware authentication standard used for two-factor login. Like rolling code, U2F functionality needs certification that other firmware doesn't ship with - Kiisu-UNLSHD adds its own support (cert generation) so U2F works on Kiisu.
+U2F (Universal 2nd Factor) is a hardware authentication standard used for two-factor login. Like rolling code, U2F functionality needs certification that other firmware doesn't ship with - Kiisu-UNLSHD adds its own support (cert generation), so U2F works on Kiisu.
 
 </details>
 
