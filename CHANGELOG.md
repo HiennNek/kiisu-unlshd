@@ -4,6 +4,8 @@
 * SubGHz: **Fix crash when exiting CLI `subghz chat` with an external CC1101** - pressing Ctrl+C dereferenced the just-freed external CC1101 radio plugin during chat worker shutdown; internal CC1101 was unaffected (by @mishamyte | PR #1036 | Fixes #829)
 * SubGHz: **Fix Frequency Analyzer leaving the radio in a degraded state** - the worker parked the internal CC1101 with the antenna isolated and its near-field AGC profile still loaded; apps driving the radio HAL directly (without a full re-init) inherited a "sticky" sensitivity loss - the radio is now reset to its boot state on exit (by @mishamyte | PR #1045 | Fixes #1044)
 * SubGHz: **Add Telcoma/Cardin EDGE protocol** (32bit, Static) (by @half2me | PR #1001)
+* SubGHz: **Fix Pecinin keeloq manufacturer** (by @lifegame1lu111)
+* SubGHz: **RAW files corruption fix** (by @Lechnio)
 * LFRFID: **Support of Hitag Micro chips** (8265/8210/H5.5) (by @mishamyte | PR #1002)
 * LFRFID: **Wipe T5577** (reset to blank, with read-back verification) (by @mishamyte | PR #1003)
 * LFRFID: **Read T5577 tags holding multiple EM4100 IDs again** - a T5577 written with several EM4100 IDs (e.g. via Multiwriter) hung on Read since the Electra protocol was added; also resets a stale PAC/Stanley decoder buffer (by @mishamyte | PR #1025 | Fixes #1024)
@@ -17,10 +19,17 @@
 * NFC: **Show a loading screen while a large CUID dictionary loads on Read** - animated spinner + "CUID dictionary is loading" label instead of a blank/frozen-looking screen while a per-UID (MFKey-recovered) dictionary is scanned (by @mishamyte | PR #1022)
 * NFC: **Fix memory leaks & double-frees in the NFC app** - heap-corrupting double-frees in the Plantain and SZPPK/SEVPPK/SK transit parsers (crash on two-trip tickets), leaks in the Saflok parser, the app API resolver (per launch) and the CUID-dictionary error path, plus a ~15x RAM over-allocation of the MIFARE DESFire file-data array (by @mishamyte | PR #1030 | Fixes #1029)
 * OFW: NFC: **Fix iso15693 emulation** dropping Read Multiple Blocks for tags >64 blocks
+* OFW PR 4383: NFC FeliCa: Add Standard card emulation support (by @nikachu2012)
 * RPC: **Add Network and GPS RPC services** (by @apfxtech (Network based on @noproto code and idea) | PR #1013)
 * Apps: **NFC Magic** - Gen2 CUID/static-nonce detection, Gen1 4b/7b UID, length-aware wipe & write guard (by @mishamyte)
-* Apps: Build tag (**25jul2026p2**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
+* Apps: Build tag (**27jul2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* OFW: bit_lib: don't read past the buffer when the bits fit one byte
+* OFW: js_event_loop: reject a non-positive timer interval
+* OFW: LFRFID: fix the Pyramid trailing Wiegand parity bit
+* OFW: LFRFID: NUL-terminate the PAC/Stanley card id before parsing it
+* OFW: NFC FeliCa: check the poller error before reading the system-code response
+* OFW: Infrared: initialize timings_cnt on decoder alloc and fix its bounds check
 * OFW: Allow for checking if an id is in use before adding to view dispatcher 
 * OFW: CCID: move USB layer from firmware HAL into ccid_test app
 * OFW: Storage Python script: add retry on file copy to Flipper
