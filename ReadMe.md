@@ -54,7 +54,7 @@ Build and launch a single app:
 Just restart your Kiisu.
 </details>
 <details>
-<summary><b>Things broke after switching from other firmware</b></summary>
+<summary><b>Things broke after switching from other firmware (e.g. qFlipper/Flipper Lab shows it as incompatible, etc...)</b></summary>
 
 Delete all files from your SD card (you can still keep captured files/downloaded DB files), then reflash the firmware.
 
