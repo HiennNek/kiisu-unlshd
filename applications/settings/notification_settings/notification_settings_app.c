@@ -5,7 +5,7 @@
 #include <gui/view_dispatcher.h>
 #include <lib/toolbox/value_index.h>
 #include <gui/gui_i.h>
-#include <u8g2_glue.h>
+#include <gui/canvas.h>
 
 #define MAX_NOTIFICATION_SETTINGS 5
 
@@ -327,9 +327,7 @@ static void lcd_inversion_changed(VariableItem* item) {
     variable_item_set_current_value_text(item, lcd_inversion_text[index]);
     app->notification->settings.lcd_inversion = lcd_inversion_value[index];
 
-    Gui* gui = furi_record_open(RECORD_GUI);
-    u8x8_d_st756x_set_inversion(&gui->canvas->fb.u8x8, lcd_inversion_value[index]);
-    furi_record_close(RECORD_GUI);
+    canvas_set_invert(lcd_inversion_value[index]);
 
     notification_message_save_settings(app->notification);
 }

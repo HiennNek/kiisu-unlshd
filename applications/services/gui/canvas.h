@@ -180,6 +180,16 @@ void canvas_set_font_direction(Canvas* canvas, CanvasDirection dir);
  */
 void canvas_invert_color(Canvas* canvas);
 
+/** Enable/disable software screen inversion
+ *
+ * When enabled, the whole framebuffer is rendered inverted:
+ * background and foreground colors are swapped in software,
+ * without touching the display controller.
+ *
+ * @param      invert  true to enable, false to disable
+ */
+void canvas_set_invert(bool invert);
+
 /** Set drawing font
  *
  * @param      canvas  Canvas instance

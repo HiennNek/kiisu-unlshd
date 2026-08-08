@@ -7,6 +7,12 @@
 #include <stdint.h>
 #include <u8g2_glue.h>
 
+static bool canvas_invert_enabled = false;
+
+void canvas_set_invert(bool invert) {
+    canvas_invert_enabled = invert;
+}
+
 const CanvasFontParameters canvas_font_params[FontTotalNumber] = {
     [FontPrimary] = {.leading_default = 12, .leading_min = 11, .height = 8, .descender = 2},
     [FontSecondary] = {.leading_default = 11, .leading_min = 9, .height = 7, .descender = 2},
@@ -142,11 +148,22 @@ const CanvasFontParameters* canvas_get_font_params(const Canvas* canvas, Font fo
 
 void canvas_clear(Canvas* canvas) {
     furi_check(canvas);
-    u8g2_ClearBuffer(&canvas->fb);
+    if(canvas_invert_enabled) {
+        u8g2_FillBuffer(&canvas->fb);
+    } else {
+        u8g2_ClearBuffer(&canvas->fb);
+    }
 }
 
 void canvas_set_color(Canvas* canvas, Color color) {
     furi_check(canvas);
+    if(canvas_invert_enabled) {
+        if(color == ColorBlack) {
+            color = ColorWhite;
+        } else if(color == ColorWhite) {
+            color = ColorBlack;
+        }
+    }
     u8g2_SetDrawColor(&canvas->fb, color);
 }
 
@@ -156,7 +173,14 @@ void canvas_set_font_direction(Canvas* canvas, CanvasDirection dir) {
 }
 
 void canvas_invert_color(Canvas* canvas) {
-    canvas->fb.draw_color = !canvas->fb.draw_color;
+    if(canvas->fb.draw_color == ColorXOR && canvas_invert_enabled) {
+        // XOR is 0x02, invert changes it to 0x00 which is White
+        // Basically like resetting to background color
+        // When screen is inverted, background color is Black instead
+        canvas->fb.draw_color = ColorBlack;
+    } else {
+        canvas->fb.draw_color = !canvas->fb.draw_color;
+    }
 }
 
 void canvas_set_font(Canvas* canvas, Font font) {

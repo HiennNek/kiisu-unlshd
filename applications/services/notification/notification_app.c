@@ -4,6 +4,7 @@
 #include <storage/storage.h>
 #include <input/input.h>
 #include <gui/gui_i.h>
+#include <gui/canvas.h>
 #include <u8g2_glue.h>
 #include <lib/toolbox/float_tools.h>
 #include "notification.h"
@@ -903,12 +904,9 @@ static void notification_apply_settings(NotificationApp* app) {
     }
     // --- NIGHT SHIFT END ---
 
-    // check RECORD_GUI is exist (insurance on boot time) then use it to setup lcd inversion mode from loaded settings;
-    if(furi_record_exists(RECORD_GUI)) {
-        Gui* gui = furi_record_open(RECORD_GUI);
-        u8x8_d_st756x_set_inversion(&gui->canvas->fb.u8x8, app->settings.lcd_inversion);
-        furi_record_close(RECORD_GUI);
-    }
+    // apply software screen inversion from loaded settings;
+    // it is a framebuffer-level flag, so it applies regardless of GUI record availability
+    canvas_set_invert(app->settings.lcd_inversion);
 }
 
 static void notification_init_settings(NotificationApp* app) {
@@ -988,6 +986,7 @@ int32_t notification_srv(void* p) {
             break;
         case LoadSettingsMessage:
             notification_load_settings(app);
+            canvas_set_invert(app->settings.lcd_inversion);
             break;
         }
 
