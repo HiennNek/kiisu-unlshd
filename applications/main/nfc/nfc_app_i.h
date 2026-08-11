@@ -111,6 +111,9 @@ typedef struct {
     bool is_key_attack;
     uint8_t key_attack_current_sector;
     bool is_card_present;
+    // Latched at RequestMode, where the poller takes our dump; not is_card_present, which drops
+    // again on CardLost -- a Skip after the card is pulled must still adopt what was recovered.
+    bool poller_has_card_data;
     MfClassicNestedPhase nested_phase;
     MfClassicPrngType prng_type;
     MfClassicBackdoor backdoor;
@@ -276,6 +279,8 @@ bool nfc_delete_shadow_file(NfcApp* instance);
 bool nfc_save(NfcApp* instance);
 
 bool nfc_delete(NfcApp* instance);
+
+bool nfc_delete_file(NfcApp* instance, const FuriString* path);
 
 bool nfc_load_from_file_select(NfcApp* instance);
 
