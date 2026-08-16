@@ -216,7 +216,7 @@ static void content_stream_pack(
     furi_string_free(val);
 }
 
-#define HA_MAX_TOPICS (6)
+#define HA_MAX_TOPICS (8) // must match TRIVIA_MAX_TOPICS on the ESP (raised from 6 in v19)
 
 // Stream every .txt pack in one dir as votable topics, skipping names already streamed.
 // `seen` holds the filenames taken so far; *topics is the running total across dirs.
@@ -302,6 +302,9 @@ static void ha_content_stream_packs(HotspotArcadeApp* app) {
         {HA_GAME_DRAW, "draw"},
         {HA_GAME_SPECTRUM, "spectrum"},
         {HA_GAME_KMK, "kmk"},
+        {HA_GAME_SECRETS, "secrets"},
+        {HA_GAME_FILLBLANK, "fillblank"},
+        {HA_GAME_SPYFALL, "spyfall"},
     };
     for(unsigned g = 0; g < sizeof(games) / sizeof(games[0]); g++) {
         int topics = 0;
@@ -366,10 +369,20 @@ static void send_next_file(HotspotArcadeApp* app) {
     FuriString* path = furi_string_alloc();
     furi_string_printf(path, "%s/%s", app->web_dir, a->file);
     FuriString* content = furi_string_alloc();
-    bool ok = ha_storage_read_file(furi_string_get_cstr(path), content, HA_FILE_MAX);
+    // Read one byte past the cap so an oversized file is DETECTED, not silently
+    // truncated: a clipped gzip stream serves a page whose tail (all the scripts)
+    // never arrives, which looks like "the app is broken" on every phone with no
+    // error anywhere. Better to refuse loudly here.
+    bool ok = ha_storage_read_file(furi_string_get_cstr(path), content, HA_FILE_MAX + 1);
     furi_string_free(path);
     if(!ok) {
         furi_string_set(app->status, "asset read err");
+        app->hs = HaHsErr;
+        furi_string_free(content);
+        return;
+    }
+    if(furi_string_size(content) > HA_FILE_MAX) {
+        furi_string_set(app->status, "web asset too big");
         app->hs = HaHsErr;
         furi_string_free(content);
         return;
@@ -411,6 +424,14 @@ static void start_handshake(HotspotArcadeApp* app) {
     uint8_t scratch[64];
     while(ha_uart_rx(app->uart, scratch, sizeof(scratch)) > 0) {
     }
+    if(app->web_bundle_crc != 0 && app->web_bundle_crc == app->board_bundle_crc) {
+        // The ESP already holds this exact bundle in flash (CRC from its PING beacon):
+        // skip CLEAR_FILES and the whole file stream, go straight to packs + SET_AP. We
+        // must NOT send CLEAR_FILES here, or the ESP would wipe the bundle we're relying on.
+        app->file_idx = app->asset_count;
+        send_next_file(app); // streams content packs, sends SET_AP, sets HaHsSetAp
+        return;
+    }
     ha_proto_send(app->uart, HA_MSG_CLEAR_FILES, NULL, 0);
     app->hs = HaHsClear;
 }
@@ -426,6 +447,7 @@ void ha_session_start(HotspotArcadeApp* app) {
 }
 
 void ha_session_stop(HotspotArcadeApp* app) {
+    ha_art_abort(app); // no half-written SVG survives the session
     ha_proto_send(app->uart, HA_MSG_STOP, NULL, 0);
     app->session_active = false;
     app->portal_running = false;
@@ -493,6 +515,23 @@ static void dispatch_frame(HotspotArcadeApp* app) {
            p[3] == HA_FW_MAGIC_3) {
             app->last_ping_tick = furi_get_tick();
             app->board_fw_version = (len >= 6) ? (uint16_t)(p[4] | ((uint16_t)p[5] << 8)) : 0;
+            // v19+: bytes 6-9 carry the CRC32 of the web bundle the ESP holds in flash, so
+            // we can skip re-streaming it when it already matches ours. Older boards omit it.
+            app->board_bundle_crc =
+                (len >= 10) ? (uint32_t)((uint32_t)p[6] | ((uint32_t)p[7] << 8) |
+                                         ((uint32_t)p[8] << 16) | ((uint32_t)p[9] << 24)) :
+                              0;
+            // v19+: byte 10 is the ESP's current game id. While hosting, mirror it so a
+            // phone-vote game change is reflected on the dashboard reliably (the beacon always
+            // arrives, unlike a one-off EVENT). Skip 0 (NONE): the ESP reports NONE for a beat
+            // after a reboot, before the "up" handler re-pushes the game to restore it -- don't
+            // clobber the game we're about to restore.
+            if(len >= 11 && app->session_active && p[10] != 0 && p[10] != app->active_game)
+                app->active_game = p[10];
+            // v1.7.1+: bytes 11-14 are the ESP's free internal heap and free PSRAM in KB (LE
+            // uint16 each), for the dashboard memory readout. Older boards omit them -> 0.
+            app->board_heap_kb = (len >= 13) ? (uint16_t)(p[11] | ((uint16_t)p[12] << 8)) : 0;
+            app->board_psram_kb = (len >= 15) ? (uint16_t)(p[13] | ((uint16_t)p[14] << 8)) : 0;
         }
         return;
     }
@@ -535,14 +574,39 @@ static void dispatch_frame(HotspotArcadeApp* app) {
         console_add(app, (const char*)p);
         feedback_success(app); // trivia reveal scored, or a Connect Four win
         break;
+    case HA_MSG_ART:
+        // Finished Frankendraw artwork: op byte + JSON. Straight through to the SVG
+        // writer -- a segment at a time, nothing held between frames.
+        if(len >= 1) {
+            const char* js = (const char*)p + 1;
+            if(p[0] == HA_ART_BEGIN)
+                ha_art_begin(app, js);
+            else if(p[0] == HA_ART_STROKE)
+                ha_art_stroke(app, js);
+            else if(p[0] == HA_ART_END)
+                ha_art_end(app);
+        }
+        break;
     case HA_MSG_EVENT: {
         // Game-specific host-facing status line for the console / duel feed.
         char ev[64];
         if(ha_json_str((const char*)p, "duel", ev, sizeof(ev)) ||
            ha_json_str((const char*)p, "pong", ev, sizeof(ev)) ||
-           ha_json_str((const char*)p, "draw", ev, sizeof(ev))) {
+           ha_json_str((const char*)p, "draw", ev, sizeof(ev)) ||
+           ha_json_str((const char*)p, "chess", ev, sizeof(ev)) ||
+           ha_json_str((const char*)p, "bs", ev, sizeof(ev)) ||
+           ha_json_str((const char*)p, "spyfall", ev, sizeof(ev))) {
             furi_string_set_str(app->last_event, ev);
             console_add(app, ev);
+        } else if(ha_json_str((const char*)p, "gamevote", ev, sizeof(ev))) {
+            // A phone-initiated game change the ESP approved. Update our displayed active game
+            // immediately if this EVENT arrives; the PING beacon carries the current game as a
+            // reliable backstop regardless. Do NOT resend SELECT_GAME -- keeping active_game in
+            // sync is also what stops the "up" handler from reverting the vote after a reboot.
+            int id;
+            if(strcmp(ev, "approved") == 0 && ha_json_int((const char*)p, "id", &id) && id >= 0 &&
+               id <= HA_GAME_SECRETS)
+                app->active_game = (uint8_t)id;
         } else if(ha_json_str((const char*)p, "chat", ev, sizeof(ev))) {
             console_add(app, ev); // lobby chatter, not a game status line
         }
