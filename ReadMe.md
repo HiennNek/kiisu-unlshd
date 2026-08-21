@@ -56,7 +56,7 @@ Just restart your Kiisu.
 <details>
 <summary><b>Things broke after switching from other firmware (e.g. qFlipper/Flipper Lab shows it as incompatible, etc...)</b></summary>
 
-Delete all files from your SD card (you can still keep captured files/downloaded DB files), then reflash the firmware.
+Delete all files from your SD card (you can still keep captured files/downloaded DB files), then reinstall the firmware.
 
 If you can't flash the firmware using the normal way, try flashing it in DFU mode. (Turn off Kiisu, then hold the `OK` button and plug your Kiisu into your PC. qFlipper and lab.flipper.net will recognize it as DFU mode.)
 
