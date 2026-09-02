@@ -5,6 +5,7 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
+#include "common.h"
 
 #include "../blocks/custom_btn_i.h"
 
@@ -39,6 +40,7 @@ struct SubGhzProtocolDecoderNiceFlorS {
 
     const char* nice_flor_s_rainbow_table_file_name;
 };
+SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderNiceFlorS);
 
 struct SubGhzProtocolEncoderNiceFlorS {
     SubGhzProtocolEncoderBase base;
@@ -48,6 +50,7 @@ struct SubGhzProtocolEncoderNiceFlorS {
 
     const char* nice_flor_s_rainbow_table_file_name;
 };
+SUBGHZ_ASSERT_ENCODER_COMMON_LAYOUT(SubGhzProtocolEncoderNiceFlorS);
 
 typedef enum {
     NiceFlorSDecoderStepReset = 0,
@@ -64,9 +67,9 @@ const SubGhzProtocolDecoder subghz_protocol_nice_flor_s_decoder = {
     .free = subghz_protocol_decoder_nice_flor_s_free,
 
     .feed = subghz_protocol_decoder_nice_flor_s_feed,
-    .reset = subghz_protocol_decoder_nice_flor_s_reset,
+    .reset = subghz_protocol_decoder_common_reset,
 
-    .get_hash_data = subghz_protocol_decoder_nice_flor_s_get_hash_data,
+    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
     .serialize = subghz_protocol_decoder_nice_flor_s_serialize,
     .deserialize = subghz_protocol_decoder_nice_flor_s_deserialize,
     .get_string = subghz_protocol_decoder_nice_flor_s_get_string,
@@ -74,11 +77,11 @@ const SubGhzProtocolDecoder subghz_protocol_nice_flor_s_decoder = {
 
 const SubGhzProtocolEncoder subghz_protocol_nice_flor_s_encoder = {
     .alloc = subghz_protocol_encoder_nice_flor_s_alloc,
-    .free = subghz_protocol_encoder_nice_flor_s_free,
+    .free = subghz_protocol_encoder_common_free,
 
     .deserialize = subghz_protocol_encoder_nice_flor_s_deserialize,
-    .stop = subghz_protocol_encoder_nice_flor_s_stop,
-    .yield = subghz_protocol_encoder_nice_flor_s_yield,
+    .stop = subghz_protocol_encoder_common_stop,
+    .yield = subghz_protocol_encoder_common_yield,
 };
 
 const SubGhzProtocol subghz_protocol_nice_flor_s = {
@@ -112,13 +115,6 @@ void* subghz_protocol_encoder_nice_flor_s_alloc(SubGhzEnvironment* environment) 
     instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
     instance->encoder.is_running = false;
     return instance;
-}
-
-void subghz_protocol_encoder_nice_flor_s_free(void* context) {
-    furi_assert(context);
-    SubGhzProtocolEncoderNiceFlorS* instance = context;
-    free(instance->encoder.upload);
-    free(instance);
 }
 
 static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, uint8_t hold_bit);
@@ -347,29 +343,6 @@ SubGhzProtocolStatus
     return res;
 }
 
-void subghz_protocol_encoder_nice_flor_s_stop(void* context) {
-    SubGhzProtocolEncoderNiceFlorS* instance = context;
-    instance->encoder.is_running = false;
-}
-
-LevelDuration subghz_protocol_encoder_nice_flor_s_yield(void* context) {
-    SubGhzProtocolEncoderNiceFlorS* instance = context;
-
-    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
-        instance->encoder.is_running = false;
-        return level_duration_reset();
-    }
-
-    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
-
-    if(++instance->encoder.front == instance->encoder.size_upload) {
-        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
-        instance->encoder.front = 0;
-    }
-
-    return ret;
-}
-
 /**
  * Read bytes from rainbow table
  * @param p array[10]  P0-P1|P2-P3-P4-P5-P6-P7-P8-P9-P10
@@ -585,9 +558,8 @@ bool subghz_protocol_nice_flor_s_create_data(
 }
 
 void* subghz_protocol_decoder_nice_flor_s_alloc(SubGhzEnvironment* environment) {
-    SubGhzProtocolDecoderNiceFlorS* instance = malloc(sizeof(SubGhzProtocolDecoderNiceFlorS));
-    instance->base.protocol = &subghz_protocol_nice_flor_s;
-    instance->generic.protocol_name = instance->base.protocol->name;
+    SubGhzProtocolDecoderNiceFlorS* instance = subghz_protocol_decoder_common_alloc(
+        sizeof(SubGhzProtocolDecoderNiceFlorS), &subghz_protocol_nice_flor_s);
     instance->nice_flor_s_rainbow_table_file_name =
         subghz_environment_get_nice_flor_s_rainbow_table_file_name(environment);
     if(instance->nice_flor_s_rainbow_table_file_name) {
@@ -602,12 +574,6 @@ void subghz_protocol_decoder_nice_flor_s_free(void* context) {
     SubGhzProtocolDecoderNiceFlorS* instance = context;
     instance->nice_flor_s_rainbow_table_file_name = NULL;
     free(instance);
-}
-
-void subghz_protocol_decoder_nice_flor_s_reset(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderNiceFlorS* instance = context;
-    instance->decoder.parser_step = NiceFlorSDecoderStepReset;
 }
 
 void subghz_protocol_decoder_nice_flor_s_feed(void* context, bool level, uint32_t duration) {
@@ -763,13 +729,6 @@ static void subghz_protocol_nice_flor_s_remote_controller(
         subghz_custom_btn_set_original(instance->btn);
     }
     subghz_custom_btn_set_max(4);
-}
-
-uint8_t subghz_protocol_decoder_nice_flor_s_get_hash_data(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderNiceFlorS* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
-        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 
 SubGhzProtocolStatus subghz_protocol_decoder_nice_flor_s_serialize(
