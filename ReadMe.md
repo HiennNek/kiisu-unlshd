@@ -54,13 +54,20 @@ Build and launch a single app:
 Just restart your Kiisu.
 </details>
 <details>
-<summary><b>Things broke after switching from other firmware (e.g. qFlipper/Flipper Lab shows it as incompatible, etc...)</b></summary>
+<summary><b>Things broke after switching from other firmware (e.g., qFlipper/Flipper Lab shows it as incompatible, etc...)</b></summary>
 
 Delete all files from your SD card (you can still keep captured files/downloaded DB files), then reinstall the firmware.
 
 If you can't flash the firmware using the normal way, try flashing it in DFU mode. (Turn off Kiisu, then hold the `OK` button and plug your Kiisu into your PC. qFlipper and lab.flipper.net will recognize it as DFU mode.)
 
 You can find the DFU file in the latest [releases](https://github.com/HiennNek/kiisu-unlshd/releases).
+</details>
+<details>
+<summary><b>qFlipper can't install the firmware (Unknown error occurred, timeout error, etc.)</b></summary>
+
+Use [lab.flipper.net](https://lab.flipper.net/). If it does not work, try putting it in DFU mode and flashing the DFU file.
+
+How to enter DFU mode: Unplug your Kiisu, then hold the `OK` button while connecting through USB. Flipper Lab/qFlipper will recognize it as being in DFU mode.
 </details>
 <details>
 <summary><b>Why doesn't U2F work?</b></summary>
