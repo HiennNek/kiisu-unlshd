@@ -13,9 +13,22 @@
 
 ## How to install
 
+### Option #1: Using web installer (recommended)
+
+1. Visit [kiisu-web-updater.pages.dev](https://kiisu-web-updater.pages.dev/)
+3. Choose `Unleashed (Kiisu-MNTM)`
+4. Select `INSTALL` (or `UPDATE`)
+
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/8288a882-9c6f-41ae-afed-593b32173665" />
+
+<details>
+<summary> <h3> Option #2: Using Flipper Lab/qFlipper <h3> </summary>
+
 1. Download **`kiisu-unlshd_XXXXXXXX_dd-MM-yyyy.tgz`** from [Releases](https://github.com/HiennNek/kiisu-unlshd/releases)
 2. Open **qFlipper** or visit [lab.flipper.net](https://lab.flipper.net/)
 3. Select **Install from file** and choose the downloaded file
+
+</details>
 
 ## How to build
 
