@@ -16,7 +16,7 @@
 ### Option #1: Using web installer (recommended)
 
 1. Visit [kiisu-web-updater.pages.dev](https://kiisu-web-updater.pages.dev/)
-3. Choose `Unleashed (Kiisu-MNTM)`
+3. Choose `Unleashed (Kiisu-UNLSHD)`
 4. Select `INSTALL` (or `UPDATE`)
 
 <img width="500" alt="image" src="https://github.com/user-attachments/assets/8288a882-9c6f-41ae-afed-593b32173665" />
