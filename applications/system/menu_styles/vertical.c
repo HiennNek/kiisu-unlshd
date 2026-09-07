@@ -1,3 +1,10 @@
+/**
+ * @file vertical.c
+ * Vertical main menu style.
+ *
+ * Ported from Momentum Firmware (GPL-3.0), originally by Willy-JL (@WillyJL):
+ * https://github.com/Next-Flip/Momentum-Firmware/commit/ae86e6b6379e795d4fa45d7b4229f355b6933968
+ */
 #include "menu_style_helpers.h"
 #include <furi_hal_rtc.h>
 
@@ -5,7 +12,8 @@ static void menu_style_vertical_draw(Canvas* canvas, MenuModel* model) {
     size_t position = model->position;
     size_t count = model->count;
 
-    CanvasOrientation orientation = canvas_get_orientation(canvas);
+    // Deliberately not restored at the end - see MenuStyle::draw in menu.h. Restoring it would
+    // stream a rotated image tagged horizontal, which qFlipper and the mobile app draw sideways.
     canvas_set_orientation(canvas, CanvasOrientationVertical);
 
     size_t shift = model->offset;
@@ -44,8 +52,6 @@ static void menu_style_vertical_draw(Canvas* canvas, MenuModel* model) {
             canvas_set_color(canvas, ColorBlack);
         }
     }
-
-    canvas_set_orientation(canvas, orientation);
 }
 
 static size_t menu_style_vertical_navigate(MenuModel* model, InputKey key) {

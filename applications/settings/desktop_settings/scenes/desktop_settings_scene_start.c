@@ -1,8 +1,5 @@
 #include <applications.h>
 #include <lib/toolbox/value_index.h>
-#include <storage/storage.h>
-#include <flipper_application/flipper_application.h>
-#include <loader/loader.h>
 
 #include "../desktop_settings_app.h"
 #include "desktop_settings_scene.h"
@@ -80,56 +77,6 @@ const uint32_t displayBatteryPercentage_value[BATTERY_VIEW_COUNT] = {
     DISPLAY_BATTERY_RETRO_5,
     DISPLAY_BATTERY_BAR_PERCENT};
 
-static void desktop_settings_scene_start_menu_styles_load(DesktopSettingsApp* app) {
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    File* dir = storage_file_alloc(storage);
-    FuriString* path = furi_string_alloc();
-    FuriString* name = furi_string_alloc();
-    char file[64];
-    uint8_t icon[FAP_MANIFEST_MAX_ICON_SIZE];
-    uint8_t* icon_ptr = icon;
-
-    if(storage_dir_open(dir, LOADER_MENU_STYLES_PATH)) {
-        while(storage_dir_read(dir, NULL, file, sizeof(file))) {
-            size_t len = strlen(file);
-            if(len < 5 || len >= sizeof(app->settings.menu_style) ||
-               strcmp(file + len - 4, ".fal") != 0) {
-                continue;
-            }
-            furi_string_printf(path, "%s/%s", LOADER_MENU_STYLES_PATH, file);
-            if(!flipper_application_load_name_and_icon(path, storage, &icon_ptr, name)) {
-                continue;
-            }
-            size_t pos = app->menu_styles_count;
-            app->menu_styles =
-                realloc(app->menu_styles, (pos + 1) * sizeof(DesktopSettingsMenuStyleEntry));
-            while(pos && furi_string_cmp(app->menu_styles[pos - 1].name, name) > 0) {
-                app->menu_styles[pos] = app->menu_styles[pos - 1];
-                pos--;
-            }
-            app->menu_styles[pos].file = furi_string_alloc_set_str(file);
-            app->menu_styles[pos].name = furi_string_alloc_set(name);
-            app->menu_styles_count++;
-        }
-    }
-
-    storage_dir_close(dir);
-    storage_file_free(dir);
-    furi_string_free(path);
-    furi_string_free(name);
-    furi_record_close(RECORD_STORAGE);
-}
-
-static void desktop_settings_scene_start_menu_styles_free(DesktopSettingsApp* app) {
-    for(size_t i = 0; i < app->menu_styles_count; i++) {
-        furi_string_free(app->menu_styles[i].file);
-        furi_string_free(app->menu_styles[i].name);
-    }
-    free(app->menu_styles);
-    app->menu_styles = NULL;
-    app->menu_styles_count = 0;
-}
-
 static void desktop_settings_scene_start_menu_style_changed(VariableItem* item) {
     DesktopSettingsApp* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
@@ -191,6 +138,15 @@ void desktop_settings_scene_start_on_enter(void* context) {
     VariableItem* item;
     uint8_t value_index;
 
+    // app_alloc already has the loading view up for the first pass; switching again is for a
+    // retry after a scan that could not read the directory, when the settings list is what is on
+    // screen. The scan costs an SD manifest read per plugin, and one that got to the end is kept
+    // for the life of the app rather than repeated on every return to this scene.
+    if(!app->menu_styles_loaded) {
+        view_dispatcher_show_loading(app->view_dispatcher);
+        desktop_settings_menu_styles_load(app);
+    }
+
     variable_item_list_add(variable_item_list, "PIN Setup", 1, NULL, NULL);
 
     item = variable_item_list_add(
@@ -246,11 +202,10 @@ void desktop_settings_scene_start_on_enter(void* context) {
     variable_item_set_current_value_index(item, value_index);
     variable_item_set_current_value_text(item, clock_enable_text[value_index]);
 
-    desktop_settings_scene_start_menu_styles_load(app);
     item = variable_item_list_add(
         variable_item_list,
         "Menu Style",
-        app->menu_styles_count + 1,
+        app->menu_styles_count + 1, // Plus "Default"; MENU_STYLES_MAX keeps this in a uint8_t
         desktop_settings_scene_start_menu_style_changed,
         app);
 
@@ -262,9 +217,15 @@ void desktop_settings_scene_start_on_enter(void* context) {
         }
     }
     variable_item_set_current_value_index(item, value_index);
-    variable_item_set_current_value_text(
-        item,
-        value_index ? furi_string_get_cstr(app->menu_styles[value_index - 1].name) : "Default");
+    const char* menu_style_text = "Default";
+    if(value_index) {
+        menu_style_text = furi_string_get_cstr(app->menu_styles[value_index - 1].name);
+    } else if(app->settings.menu_style[0]) {
+        // Configured style is not in the list - but say so only if we actually got to look, since
+        // neither "it was deleted" nor "we chose the built-in one" is true when the scan failed
+        menu_style_text = app->menu_styles_loaded ? "Missing" : "Unknown";
+    }
+    variable_item_set_current_value_text(item, menu_style_text);
 
     variable_item_list_add(variable_item_list, "Change Kiisu Name", 0, NULL, app);
 
@@ -426,7 +387,6 @@ bool desktop_settings_scene_start_on_event(void* context, SceneManagerEvent even
 void desktop_settings_scene_start_on_exit(void* context) {
     DesktopSettingsApp* app = context;
     variable_item_list_reset(app->variable_item_list);
-    desktop_settings_scene_start_menu_styles_free(app);
     desktop_settings_save(&app->settings);
 
     // Trigger UI update in case we changed battery layout

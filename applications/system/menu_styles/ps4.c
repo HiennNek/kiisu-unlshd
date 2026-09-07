@@ -1,15 +1,29 @@
+/**
+ * @file ps4.c
+ * PS4 main menu style.
+ *
+ * Ported from Momentum Firmware (GPL-3.0), originally by Willy-JL (@WillyJL):
+ * https://github.com/Next-Flip/Momentum-Firmware/commit/cef4a004f74fecca7556ea7aeb947897a1f392b5
+ */
 #include "menu_style_helpers.h"
 #include <dolphin/dolphin.h>
 #include <furi_hal_version.h>
 
+// dolphin_stats() is a blocking round trip to another service, and this runs in the draw
+// callback, on the GUI thread, under the model lock - cache it so it cannot stall every frame.
+// A MenuStyle has no lifecycle hook to fetch it from instead. `known` is not redundant with
+// next_refresh: that starts at 0, so on a first draw past ~24.8 days of uptime the tick
+// comparison is already negative and the level would sit at 0 until the tick counter wrapped.
 static uint8_t menu_style_ps4_level(void) {
     static uint32_t next_refresh;
     static uint8_t level;
-    if((int32_t)(furi_get_tick() - next_refresh) >= 0) {
+    static bool known;
+    if(!known || (int32_t)(furi_get_tick() - next_refresh) >= 0) {
         Dolphin* dolphin = furi_record_open(RECORD_DOLPHIN);
         level = dolphin_stats(dolphin).level;
         furi_record_close(RECORD_DOLPHIN);
         next_refresh = furi_get_tick() + furi_ms_to_ticks(5000);
+        known = true;
     }
     return level;
 }

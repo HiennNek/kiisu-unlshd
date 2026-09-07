@@ -1,4 +1,13 @@
+/**
+ * @file compact.c
+ * Compact main menu style.
+ *
+ * Ported from Momentum Firmware (GPL-3.0), originally by @MatthewKuKanich:
+ * https://github.com/Next-Flip/Momentum-Firmware/commit/09986b33a7ff1912a1167f2427eddc8adfe82e6f
+ */
 #include "menu_style_helpers.h"
+
+#define MENU_STYLE_COMPACT_ROWS 8 // Two columns of eight, so a page of sixteen
 
 static void menu_style_compact_draw(Canvas* canvas, MenuModel* model) {
     size_t position = model->position;
@@ -6,8 +15,9 @@ static void menu_style_compact_draw(Canvas* canvas, MenuModel* model) {
 
     canvas_set_font(canvas, FontBatteryPercent);
     for(size_t i = 0; i < 2; i++) {
-        for(size_t j = 0; j < 8; j++) {
-            size_t index = i * 8 + j + (position - (position % 16));
+        for(size_t j = 0; j < MENU_STYLE_COMPACT_ROWS; j++) {
+            size_t index = i * MENU_STYLE_COMPACT_ROWS + j +
+                           (position - (position % (MENU_STYLE_COMPACT_ROWS * 2)));
             if(index >= count) continue;
             int32_t y = 8 * j;
             int32_t x = 64 * i;
@@ -33,11 +43,10 @@ static void menu_style_compact_draw(Canvas* canvas, MenuModel* model) {
 }
 
 static size_t menu_style_compact_navigate(MenuModel* model, InputKey key) {
-    size_t position = model->position;
     switch(key) {
     case InputKeyLeft:
     case InputKeyRight:
-        return (position % 16) < 8 ? position + 8 : position - 8;
+        return menu_style_navigate_two_columns(model, MENU_STYLE_COMPACT_ROWS);
     default:
         return menu_style_navigate_list(model, key);
     }
