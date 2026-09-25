@@ -14,6 +14,8 @@ void subghz_scene_set_type_submenu_callback(void* context, uint32_t index) {
 static const char* submenu_names[SetTypeMAX] = {
     [SetTypeFaacSLH_868] = "FAAC SLH 868MHz",
     [SetTypeFaacSLH_433] = "FAAC SLH 433MHz",
+    [SetTypeGenius_433] = "Genius 433MHz",
+    [SetTypeGenius_868] = "Genius 868MHz",
     [SetTypeBFTMitto] = "BFT Mitto 433MHz",
     [SetTypeErreka433] = "Erreka 433MHz",
     [SetTypeSomfyTelis] = "Somfy Telis 433MHz",
@@ -94,6 +96,7 @@ static const char* submenu_names[SetTypeMAX] = {
     [SetTypeZKTeco430] = "ZKTeco 430MHz",
     [SetTypeGangQi_433] = "GangQi 433MHz",
     [SetTypeHollarm_433] = "Hollarm 433MHz",
+    [SetTypeNordIce_433] = "Nord ICE 433MHz",
     [SetTypeReversRB2_433] = "Revers RB2 433MHz",
     [SetTypeMarantec24_868] = "Marantec24 868MHz",
     [SetTypeMarantec_433] = "Marantec 433MHz",

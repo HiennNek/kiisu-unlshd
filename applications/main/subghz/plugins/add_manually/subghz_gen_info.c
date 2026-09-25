@@ -195,6 +195,18 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 42,
             .data.te = 0};
         break;
+    case SetTypeNordIce_433:
+        gen_info = (GenInfo){
+            .type = GenData,
+            .mod = "AM650",
+            .freq = 433920000,
+            // Button 4 of 0x4, 0x8, 0x1, 0x2 at bits 12..9, plus bit 13 which is set on
+            // every frame; bit 14 stays clear, the encoder sets it on one frame of the pair
+            .data.name = SUBGHZ_PROTOCOL_NORD_ICE_NAME,
+            .data.key = (key & 0x1FFFF81FF) | 0x2400,
+            .data.bits = 33,
+            .data.te = 0};
+        break;
     case SetTypeReversRB2_433:
         gen_info = (GenInfo){
             .type = GenData,
@@ -258,6 +270,29 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .faac_slh.cnt = 0x02,
             .faac_slh.seed = (uint32_t)key,
             .faac_slh.manuf = "FAAC_SLH"};
+        break;
+    case SetTypeGenius_433:
+        // Genius shares the Faac SLH frame and differs only in the manufacture key
+        gen_info = (GenInfo){
+            .type = GenFaacSLH,
+            .mod = "AM650",
+            .freq = 433920000,
+            .faac_slh.serial = ((key & 0x00FFFFF0) | 0xA0000006) >> 4,
+            .faac_slh.btn = 0x06,
+            .faac_slh.cnt = 0x02,
+            .faac_slh.seed = (uint32_t)key,
+            .faac_slh.manuf = "Genius"};
+        break;
+    case SetTypeGenius_868:
+        gen_info = (GenInfo){
+            .type = GenFaacSLH,
+            .mod = "AM650",
+            .freq = 868350000,
+            .faac_slh.serial = ((key & 0x00FFFFF0) | 0xA0000006) >> 4,
+            .faac_slh.btn = 0x06,
+            .faac_slh.cnt = 0x02,
+            .faac_slh.seed = (uint32_t)key,
+            .faac_slh.manuf = "Genius"};
         break;
     case SetTypeBeninca433:
         gen_info = (GenInfo){
