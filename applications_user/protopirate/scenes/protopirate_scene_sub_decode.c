@@ -2,6 +2,9 @@
 #include "../protopirate_app_i.h"
 #ifdef ENABLE_SUB_DECODE_SCENE
 
+#define STATE_EMULATE 0
+#define STATE_BF      1
+
 #ifndef PROTOPIRATE_SUB_DECODE_PLUGIN_BUILD
 
 void protopirate_scene_sub_decode_on_enter(void* context) {
@@ -9,6 +12,16 @@ void protopirate_scene_sub_decode_on_enter(void* context) {
 }
 
 bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent event) {
+    if(event.type == SceneManagerEventTypeCustom) {
+        if(event.event == ProtoPirateCustomEventSubDecodeEmulateDelayedStart) {
+#ifdef ENABLE_EMULATE_FEATURE
+            scene_manager_next_scene(
+                ((ProtoPirateApp*)context)->scene_manager, ProtoPirateSceneEmulate);
+#endif
+            return true;
+        }
+    }
+
     return protopirate_tool_scene_on_event(context, event);
 }
 
@@ -33,12 +46,12 @@ void protopirate_scene_sub_decode_on_exit(void* context) {
 #include <lib/subghz/types.h>
 
 #ifdef PROTOPIRATE_SUB_DECODE_PLUGIN_BUILD
-#include "protopirate_sub_decode_plugin_icons.h"
+#include "pp_sub_decode_icons.h"
 #else
 #include "proto_pirate_icons.h"
 #endif
 
-#define TAG "ProtoPirateSubDecode"
+#define TAG "PPSubDecode"
 
 static const ProtoPirateToolSceneHostApi* g_tool_scene_host_api = NULL;
 
@@ -80,6 +93,8 @@ static const ProtoPirateToolSceneHostApi* g_tool_scene_host_api = NULL;
 #define protopirate_view_receiver_sync_menu_from_history(receiver, history) \
     g_tool_scene_host_api->receiver_sync_menu_from_history(receiver, history)
 #define protopirate_psa_bf_plugin_ensure_loaded(app) \
+    g_tool_scene_host_api->psa_bf_plugin_ensure_loaded(app)
+#define protopirate_psa_bf_plugin_unload_if_idle(app) \
     g_tool_scene_host_api->psa_bf_plugin_ensure_loaded(app)
 #define protopirate_psa_bf_context_release(app) g_tool_scene_host_api->psa_bf_context_release(app)
 
@@ -132,7 +147,6 @@ typedef struct {
     uint16_t signal_count;
     uint16_t selected_history_index;
     bool showing_signal_info;
-    bool signal_info_left_is_emulate;
     bool previous_preset_saved;
     char previous_preset_name[SUB_DECODE_PRESET_NAME_MAX];
     uint32_t previous_frequency;
@@ -369,10 +383,16 @@ static void protopirate_scene_sub_decode_widget_callback(
             view_dispatcher_send_custom_event(
                 app->view_dispatcher, ProtoPirateCustomEventSubDecodeSave);
         } else if(result == GuiButtonTypeLeft) {
-            SubDecodeContext* ctx = g_decode_ctx;
-            const uint32_t left_event = (ctx && ctx->signal_info_left_is_emulate) ?
-                                            ProtoPirateCustomEventSubDecodeEmulate :
-                                            ProtoPirateCustomEventSubDecodeBruteforceStart;
+
+#ifdef ENABLE_EMULATE_FEATURE
+            const uint32_t left_event =
+                (scene_manager_get_scene_state(app->scene_manager, ProtoPirateSceneSubDecode) ==
+                 STATE_BF) ?
+                    ProtoPirateCustomEventBruteforceStart :
+                    ProtoPirateCustomEventSubDecodeEmulate;
+#else
+            const uint32_t left_event = ProtoPirateCustomEventBruteforceStart;
+#endif
             view_dispatcher_send_custom_event(app->view_dispatcher, left_event);
         }
     }
@@ -473,7 +493,6 @@ static void protopirate_scene_sub_decode_reset_for_file(SubDecodeContext* ctx) {
     ctx->signal_count = 0;
     ctx->selected_history_index = 0;
     ctx->showing_signal_info = false;
-    ctx->signal_info_left_is_emulate = false;
     ctx->worker_startup_delay = 0;
     ctx->decode_elapsed_us = 0;
 }
@@ -668,19 +687,21 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                     size_t name_len = strlen(name_start);
                     const char* dot = strrchr(name_start, '.');
                     if(dot) name_len = dot - name_start;
-                    if(name_len >= sizeof(app->save_filename))
-                        name_len = sizeof(app->save_filename) - 1;
+                    if(name_len > 64) name_len = 64;
 
+                    if(app->save_filename) free(app->save_filename);
+                    app->save_filename = malloc(name_len + 1);
                     memcpy(app->save_filename, name_start, name_len);
-                    app->save_filename[name_len] = '\0';
                 } else {
-                    snprintf(app->save_filename, sizeof(app->save_filename), "capture");
+                    if(app->save_filename) free(app->save_filename);
+                    uint8_t len = 8;
+                    app->save_filename = malloc(len);
+                    snprintf(app->save_filename, len, "capture");
                 }
                 furi_string_free(auto_path);
 
                 // Store context for when text input confirms
                 app->save_history_idx = app->txrx->idx_menu_chosen;
-                app->save_from_saved_info = false;
 
                 //Make sure we have a text input window.
                 app->text_input = text_input_alloc();
@@ -697,7 +718,7 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                     protopirate_scene_sub_decode_text_input_callback,
                     app,
                     app->save_filename,
-                    sizeof(app->save_filename),
+                    strlen(app->save_filename),
                     false); // don't clear default text
 
                 view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewTextInput);
@@ -742,6 +763,11 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                 text_input_free(app->text_input);
                 app->text_input = NULL;
             }
+
+            if(app->save_filename) {
+                free(app->save_filename);
+                app->save_filename = NULL;
+            }
             consumed = true;
 
         }
@@ -753,14 +779,14 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                 protopirate_history_get_raw_data(ctx->history, ctx->selected_history_index);
             if(ff && protopirate_storage_save_capture_to_path(ff, PROTOPIRATE_TEMP_FILE)) {
                 protopirate_history_release_scratch(ctx->history);
-                if(app->loaded_file_path) furi_string_free(app->loaded_file_path);
-                app->loaded_file_path = furi_string_alloc_set(PROTOPIRATE_TEMP_FILE);
-                FURI_LOG_I(
-                    TAG,
-                    "Emulate from sub-decode temp file: %s",
-                    furi_string_get_cstr(app->loaded_file_path));
-                app->tool_scene_nav_pending = TOOL_SCENE_NAV_NEXT;
-                app->tool_scene_nav_target = ProtoPirateSceneEmulate;
+                if(app->loaded_file_path) free(app->loaded_file_path);
+                size_t len = strlen(PROTOPIRATE_TEMP_FILE) + 1;
+                app->loaded_file_path = malloc(len);
+                snprintf(app->loaded_file_path, len, PROTOPIRATE_TEMP_FILE);
+
+                FURI_LOG_I(TAG, "Emulate from sub-decode temp file: %s", app->loaded_file_path);
+                view_dispatcher_send_custom_event(
+                    app->view_dispatcher, ProtoPirateCustomEventSubDecodeEmulateDelayedStart);
             } else {
                 FURI_LOG_E(
                     TAG, "Failed to prepare emulate capture %u", ctx->selected_history_index);
@@ -769,7 +795,7 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
             consumed = true;
         }
 #endif
-        else if(event.event == ProtoPirateCustomEventSubDecodeBruteforceStart) {
+        else if(event.event == ProtoPirateCustomEventBruteforceStart) {
             app->txrx->idx_menu_chosen = ctx->selected_history_index;
             if(protopirate_psa_bf_plugin_ensure_loaded(app) && app->psa_bf_plugin &&
                app->psa_bf_plugin->on_scene_event(app, ProtoPiratePsaBfContextSubDecode, event)) {
@@ -779,7 +805,7 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
             }
             consumed = true;
             return consumed;
-        } else if(event.event == ProtoPirateCustomEventPsaBruteforceComplete) {
+        } else if(event.event == ProtoPirateCustomEventBruteforceComplete) {
             app->txrx->idx_menu_chosen = ctx->selected_history_index;
             if(app->psa_bf_plugin) {
                 app->psa_bf_plugin->on_scene_event(app, ProtoPiratePsaBfContextSubDecode, event);
@@ -825,8 +851,6 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
            app->psa_bf_plugin->on_scene_event(app, ProtoPiratePsaBfContextSubDecode, event)) {
             return consumed;
         }
-
-        FURI_LOG_D(TAG, "Tick: state=%d", ctx->state);
 
         switch(ctx->state) {
         case DecodeStateOpenFile: {
@@ -1298,10 +1322,7 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                     protopirate_scene_sub_decode_widget_callback,
                     app);
 
-                ctx->signal_info_left_is_emulate = false;
-#ifdef ENABLE_EMULATE_FEATURE
-                bool left_button_used = false;
-#endif
+                bool left_button_bf = false;
                 app->emulate_disabled_for_loaded = true;
 
                 // Store reference to history item's flipper format for saving
@@ -1326,25 +1347,26 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                         app->txrx->idx_menu_chosen = ctx->selected_history_index;
                         bool needs_bf = false;
                         if(protopirate_psa_bf_plugin_ensure_loaded(app) && app->psa_bf_plugin) {
-                            needs_bf = app->psa_bf_plugin->needs_bruteforce(
-                                app, ProtoPiratePsaBfContextSubDecode);
+                            needs_bf = app->psa_bf_plugin->needs_bruteforce(ff);
                         }
+                        protopirate_psa_bf_plugin_unload_if_idle(app);
                         if(needs_bf) {
+                            scene_manager_set_scene_state(
+                                app->scene_manager, ProtoPirateSceneSubDecode, STATE_BF);
+
                             widget_add_button_element(
                                 app->widget,
                                 GuiButtonTypeLeft,
                                 "BF",
                                 protopirate_scene_sub_decode_widget_callback,
                                 app);
-#ifdef ENABLE_EMULATE_FEATURE
-                            left_button_used = true;
-#endif
+                            left_button_bf = true;
                         }
                     }
                 }
 
 #ifdef ENABLE_EMULATE_FEATURE
-                if(!left_button_used && app->emulate_feature_enabled &&
+                if(!left_button_bf && app->emulate_feature_enabled &&
                    !app->emulate_disabled_for_loaded) {
                     widget_add_button_element(
                         app->widget,
@@ -1352,11 +1374,13 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                         "Emulate",
                         protopirate_scene_sub_decode_widget_callback,
                         app);
-                    ctx->signal_info_left_is_emulate = true;
-                    left_button_used = true;
                 }
 #endif
 
+                scene_manager_set_scene_state(
+                    app->scene_manager,
+                    ProtoPirateSceneSubDecode,
+                    left_button_bf ? STATE_BF : STATE_EMULATE);
                 furi_string_free(text);
             }
 
@@ -1385,7 +1409,10 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
         if(ctx->showing_signal_info) {
             // In signal info - go back to history
             ctx->showing_signal_info = false;
-            //ctx->selected_history_index = 0;
+            if(app->save_filename) {
+                free(app->save_filename);
+                app->save_filename = NULL;
+            };
             ctx->state = DecodeStateShowHistory;
             view_dispatcher_send_custom_event(
                 app->view_dispatcher, ProtoPirateCustomEventSubDecodeUpdate);
@@ -1445,10 +1472,6 @@ void protopirate_scene_sub_decode_on_exit(void* context) {
         app->txrx->history = NULL;
     }
 
-    if(app && app->widget) {
-        widget_reset(app->widget);
-    }
-
     if(app && app->protopirate_receiver) {
         protopirate_view_receiver_reset_menu(app->protopirate_receiver);
     }
@@ -1459,7 +1482,7 @@ static void sub_decode_plugin_set_host_api(const ProtoPirateToolSceneHostApi* ho
 }
 
 static const ProtoPirateToolScenePlugin protopirate_sub_decode_plugin = {
-    .plugin_name = "ProtoPirate Sub Decode",
+    .plugin_name = "Sub Decode",
     .kind = ProtoPirateToolScenePluginKindSubDecode,
     .set_host_api = sub_decode_plugin_set_host_api,
     .on_enter = protopirate_scene_sub_decode_on_enter,

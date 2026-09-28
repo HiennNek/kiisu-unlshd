@@ -3,6 +3,7 @@
 #include "protopirate_emulate_plugin.h"
 
 #include "../../protopirate_app_i.h"
+#include "../../helpers/protopirate_storage.h"
 
 #ifdef ENABLE_EMULATE_FEATURE
 
@@ -31,7 +32,7 @@
 #include <furi.h>
 #include <string.h>
 
-#define TAG "ProtoPirateEmulatePlugin"
+#define TAG "PPEmulatePlugin"
 
 #define MIN_TX_TIME              666U
 #define MIN_TX_TIME_KIA_V3_V4    1600U
@@ -1155,9 +1156,8 @@ static void plugin_on_enter(void* context) {
         return;
     }
 
-    if(!flipper_format_file_open_existing(
-           ctx->flipper_format, furi_string_get_cstr(app->loaded_file_path))) {
-        FURI_LOG_E(TAG, "Failed to open file: %s", furi_string_get_cstr(app->loaded_file_path));
+    if(!flipper_format_file_open_existing(ctx->flipper_format, app->loaded_file_path)) {
+        FURI_LOG_E(TAG, "Failed to open file: %s", app->loaded_file_path);
         emulate_context_free();
         notification_message(app->notifications, &sequence_error);
         emulate_request_nav_pop(app);
@@ -1571,7 +1571,7 @@ static void plugin_set_host_api(const ProtoPirateEmulateHostApi* host_api) {
 }
 
 static const ProtoPirateEmulatePlugin protopirate_emulate_plugin = {
-    .plugin_name = "ProtoPirate Emulate",
+    .plugin_name = "Emulate",
     .set_host_api = plugin_set_host_api,
     .on_enter = plugin_on_enter,
     .on_event = plugin_on_event,

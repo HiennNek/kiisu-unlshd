@@ -6,31 +6,15 @@
 #include "proto_pirate_icons.h"
 #include <storage/storage.h>
 
-#define TAG "ProtoPirateReceiverInfo"
+#define TAG "PPReceiverInfo"
+
+#define STATE_EMULATE 0
+#define STATE_BF      1
 
 static void protopirate_scene_receiver_info_widget_callback(
     GuiButtonType result,
     InputType type,
     void* context);
-
-static bool
-    protopirate_receiver_info_selected_protocol_is(ProtoPirateApp* app, const char* protocol_name) {
-    if(!app || !app->txrx || !app->txrx->history || !protocol_name) return false;
-
-    FlipperFormat* ff =
-        protopirate_history_get_raw_data(app->txrx->history, app->txrx->idx_menu_chosen);
-    if(!ff) return false;
-
-    bool match = false;
-    FuriString* protocol = furi_string_alloc();
-    if(protocol) {
-        flipper_format_rewind(ff);
-        match = flipper_format_read_string(ff, FF_PROTOCOL, protocol) &&
-                furi_string_cmp_str(protocol, protocol_name) == 0;
-        furi_string_free(protocol);
-    }
-    return match;
-}
 
 static void protopirate_scene_receiver_info_text_input_callback(void* context) {
     ProtoPirateApp* app = context;
@@ -130,27 +114,32 @@ static void protopirate_receiver_info_build_normal_widget(ProtoPirateApp* app) {
 
     bool needs_bf = false;
     if(offers_bf && protopirate_psa_bf_plugin_ensure_loaded(app) && app->psa_bf_plugin) {
-        needs_bf = app->psa_bf_plugin->widget_left_should_bruteforce(
-            app, ProtoPiratePsaBfContextReceiverInfo);
+        needs_bf = app->psa_bf_plugin->widget_left_should_bruteforce(app, ff);
     }
+    protopirate_psa_bf_plugin_unload_if_idle(app);
     if(needs_bf) {
+        scene_manager_set_scene_state(app->scene_manager, ProtoPirateSceneReceiverInfo, STATE_BF);
         widget_add_button_element(
             app->widget,
             GuiButtonTypeLeft,
             "BF",
             protopirate_scene_receiver_info_widget_callback,
             app);
-    } else
+    } else {
+        scene_manager_set_scene_state(
+            app->scene_manager, ProtoPirateSceneReceiverInfo, STATE_EMULATE);
+
 #ifdef ENABLE_EMULATE_FEATURE
         if(app->emulate_feature_enabled && !app->emulate_disabled_for_loaded) {
-        widget_add_button_element(
-            app->widget,
-            GuiButtonTypeLeft,
-            "Emulate",
-            protopirate_scene_receiver_info_widget_callback,
-            app);
-    }
+            widget_add_button_element(
+                app->widget,
+                GuiButtonTypeLeft,
+                "Emulate",
+                protopirate_scene_receiver_info_widget_callback,
+                app);
+        }
 #endif
+    }
 
     widget_add_button_element(
         app->widget,
@@ -168,6 +157,10 @@ void protopirate_receiver_info_rebuild_normal_widget(void* app) {
     protopirate_receiver_info_build_normal_widget((ProtoPirateApp*)app);
 }
 
+void protopirate_saved_info_rebuild_normal_widget(void* app) {
+    protopirate_scene_saved_info_on_enter((ProtoPirateApp*)app);
+}
+
 static void protopirate_scene_receiver_info_widget_callback(
     GuiButtonType result,
     InputType type,
@@ -182,13 +175,11 @@ static void protopirate_scene_receiver_info_widget_callback(
                 has_match ? ProtoPirateCustomEventReceiverInfoUpdate :
                             ProtoPirateCustomEventReceiverInfoSave);
         } else if(result == GuiButtonTypeLeft) {
-            if((protopirate_receiver_info_selected_protocol_is(app, "PSA") ||
-                protopirate_receiver_info_selected_protocol_is(app, "Renault V1")) &&
-               protopirate_psa_bf_plugin_ensure_loaded(app) && app->psa_bf_plugin &&
-               app->psa_bf_plugin->widget_left_should_bruteforce(
-                   app, ProtoPiratePsaBfContextReceiverInfo)) {
+            if(scene_manager_get_scene_state(app->scene_manager, ProtoPirateSceneReceiverInfo) ==
+               STATE_BF) {
                 view_dispatcher_send_custom_event(
-                    app->view_dispatcher, ProtoPirateCustomEventReceiverInfoBruteforceStart);
+                    app->view_dispatcher, ProtoPirateCustomEventBruteforceStart);
+
             }
 #ifdef ENABLE_EMULATE_FEATURE
             else if(app->emulate_feature_enabled && !app->emulate_disabled_for_loaded) {
@@ -198,7 +189,7 @@ static void protopirate_scene_receiver_info_widget_callback(
 #endif
         } else if(result == GuiButtonTypeCenter) {
             view_dispatcher_send_custom_event(
-                app->view_dispatcher, ProtoPirateCustomEventReceiverInfoBruteforceCancel);
+                app->view_dispatcher, ProtoPirateCustomEventBruteforceComplete);
         }
     }
 }
@@ -232,15 +223,13 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
     bool consumed = false;
 
     if((event.type == SceneManagerEventTypeCustom) &&
-       (event.event == ProtoPirateCustomEventReceiverInfoBruteforceStart)) {
+       (event.event == ProtoPirateCustomEventBruteforceStart)) {
         protopirate_psa_bf_plugin_ensure_loaded(app);
     }
 
     if(app->psa_bf_plugin) {
         if(app->psa_bf_plugin->is_running(app) ||
-           event.event == ProtoPirateCustomEventPsaBruteforceComplete ||
-           event.event == ProtoPirateCustomEventReceiverInfoBruteforceStart ||
-           event.event == ProtoPirateCustomEventReceiverInfoBruteforceCancel) {
+           event.event == ProtoPirateCustomEventBruteforceStart) {
             consumed = app->psa_bf_plugin->on_scene_event(
                 app, ProtoPiratePsaBfContextReceiverInfo, event);
             if(consumed) return true;
@@ -326,13 +315,16 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
                     size_t name_len = strlen(name_start);
                     const char* dot = strrchr(name_start, '.');
                     if(dot) name_len = dot - name_start;
-                    if(name_len >= sizeof(app->save_filename))
-                        name_len = sizeof(app->save_filename) - 1;
+                    if(name_len >= 64) name_len = 64;
 
+                    if(app->save_filename) free(app->save_filename);
+                    app->save_filename = malloc(name_len + 1);
                     memcpy(app->save_filename, name_start, name_len);
-                    app->save_filename[name_len] = '\0';
                 } else {
-                    snprintf(app->save_filename, sizeof(app->save_filename), "capture");
+                    if(app->save_filename) free(app->save_filename);
+                    uint8_t len = 8;
+                    app->save_filename = malloc(len);
+                    snprintf(app->save_filename, len, "capture");
                 }
                 furi_string_free(auto_path);
 
@@ -340,7 +332,6 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
                 if(app->save_protocol) furi_string_free(app->save_protocol);
                 app->save_protocol = protocol; // transfer ownership
                 app->save_history_idx = app->txrx->idx_menu_chosen;
-                app->save_from_saved_info = false;
 
                 // Configure and show text input
                 text_input_reset(app->text_input);
@@ -350,7 +341,7 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
                     protopirate_scene_receiver_info_text_input_callback,
                     app,
                     app->save_filename,
-                    sizeof(app->save_filename),
+                    strlen(app->save_filename),
                     false); // don't clear default text
 
                 view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewTextInput);
@@ -389,6 +380,19 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
 
             // Return to the receiver info widget
             view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewWidget);
+
+            //Kill the text_input view.
+            if(app->text_input) {
+                FURI_LOG_D(TAG, "Removing text_input view");
+                view_dispatcher_remove_view(app->view_dispatcher, ProtoPirateViewTextInput);
+                text_input_free(app->text_input);
+                app->text_input = NULL;
+            }
+
+            if(app->save_filename) {
+                free(app->save_filename);
+                app->save_filename = NULL;
+            }
             consumed = true;
         }
 
@@ -399,19 +403,22 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
             if(protopirate_history_get_capture_path(
                    app->txrx->history, app->txrx->idx_menu_chosen, hist_path)) {
                 protopirate_history_release_scratch(app->txrx->history);
-                if(app->loaded_file_path) furi_string_free(app->loaded_file_path);
-                app->loaded_file_path = furi_string_alloc_set(hist_path);
+                size_t len = furi_string_utf8_length(hist_path) + 1;
+                if(app->loaded_file_path) free(app->loaded_file_path);
+                app->loaded_file_path = malloc(len);
+                snprintf(app->loaded_file_path, len, furi_string_get_cstr(hist_path));
                 furi_string_free(hist_path);
-                FURI_LOG_I(
-                    TAG,
-                    "Emulate from history file: %s",
-                    furi_string_get_cstr(app->loaded_file_path));
+                FURI_LOG_I(TAG, "Emulate from history file: %s", app->loaded_file_path);
                 scene_manager_next_scene(app->scene_manager, ProtoPirateSceneEmulate);
             } else {
                 furi_string_free(hist_path);
                 FURI_LOG_E(TAG, "No capture path for index %d", app->txrx->idx_menu_chosen);
                 notification_message(app->notifications, &sequence_error);
             }
+            consumed = true;
+        }
+        if(event.event == ProtoPirateCustomEventBruteforceComplete) {
+            protopirate_scene_receiver_info_on_enter(app);
             consumed = true;
         }
 #endif

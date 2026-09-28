@@ -1,6 +1,14 @@
 #include "protopirate_config_plugin.h"
-#include "../../protopirate_app_i.h"
 #include "../../helpers/protopirate_models.h"
+
+static const ProtoPirateConfigSceneHostApi* g_config_scene_host_api = NULL;
+
+#define protopirate_preset_init(app, preset_name, frequency, preset_data, preset_data_size) \
+    g_config_scene_host_api->protopirate_preset_init(                                       \
+        app, preset_name, frequency, preset_data, preset_data_size)
+
+#define protopirate_refresh_protocol_registry(app, ensure_receiver_ready) \
+    g_config_scene_host_api->protopirate_refresh_protocol_registry(app, ensure_receiver_ready)
 
 #define ON_OFF_COUNT 2
 const char* const on_off_text[ON_OFF_COUNT] = {
@@ -166,7 +174,7 @@ static void protopirate_scene_receiver_config_set_model(VariableItem* item) {
         app->setting);
 
     //Add he car model the list, with the correct selection and text.
-    variable_item_set_item_label(item, furi_string_get_cstr(app->selected_model->name));
+    variable_item_set_item_label(item, app->selected_model->name);
     variable_item_set_current_value_text(item, "");
     variable_item_set_current_value_index(item, 0);
 
@@ -328,6 +336,8 @@ static void
     furi_check(context);
     ProtoPirateApp* app = context;
 
+    FURI_LOG_D("TEST", "Index= %lu", index);
+
     switch(index) {
     case ProtoPirateSettingIndexCarModel: {
         //Reset the Models Menu
@@ -345,7 +355,7 @@ static void
     }
 }
 
-static void plugin_on_enter(void* context) {
+static void plugin_on_enter(void* context, bool show_lock_keyboard) {
     ProtoPirateApp* app = context;
     VariableItem* item;
     uint8_t value_index;
@@ -359,7 +369,7 @@ static void plugin_on_enter(void* context) {
     //Add he car model the list, with the correct selection and text.
     item = variable_item_list_add(
         app->variable_item_list,
-        furi_string_get_cstr(app->selected_model->name),
+        app->selected_model->name,
         0, //Plus NONE
         protopirate_scene_receiver_config_set_model,
         app);
@@ -430,6 +440,7 @@ static void plugin_on_enter(void* context) {
     variable_item_set_current_value_index(item, app->tx_power);
     variable_item_set_current_value_text(item, tx_power_text[app->tx_power]);
 #endif
+
     // Auto-save option
     item = variable_item_list_add(
         app->variable_item_list,
@@ -469,18 +480,25 @@ static void plugin_on_enter(void* context) {
     variable_item_set_current_value_index(item, app->sound);
     variable_item_set_current_value_text(item, on_off_text[app->sound ? 1 : 0]);
 
-    variable_item_list_add(app->variable_item_list, "Lock Keyboard", 1, NULL, NULL);
+    //Only show the Lock Keyboard Option in Receiver. Timing Tuner Doesnt respect it, and its wierd in Configuration from the Main Menu.
     variable_item_list_set_enter_callback(
         app->variable_item_list, protopirate_scene_receiver_config_var_list_enter_callback, app);
-
+    if(show_lock_keyboard) {
+        variable_item_list_add(app->variable_item_list, "Lock Keyboard", 1, NULL, NULL);
+    }
     view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewVariableItemList);
 }
 
+void config_plugin_set_host_api(const ProtoPirateConfigSceneHostApi* host_api) {
+    g_config_scene_host_api = host_api;
+}
+
 static const ProtoPirateConfigPlugin protopirate_config_plugin = {
-    .plugin_name = "ProtoPirate Config",
+    .plugin_name = "Config",
     .car_model_get_by_index = car_model_get_by_index,
     .car_model_get_count = car_model_get_count,
     .on_enter = plugin_on_enter,
+    .set_host_api = config_plugin_set_host_api,
 };
 
 static const FlipperAppPluginDescriptor protopirate_config_plugin_descriptor = {

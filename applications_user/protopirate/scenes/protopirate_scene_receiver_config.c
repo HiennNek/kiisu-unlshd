@@ -1,16 +1,26 @@
 // scenes/protopirate_scene_receiver_config.c
-#include "../protopirate_app_i.h"
+#include "protopirate_app_i.h"
+#include "plugins/protopirate_config_plugin.h"
+#include "../helpers/protopirate_protocol_plugin_host.h"
+
+static const ProtoPirateConfigSceneHostApi protopirate_config_scene_host_api = {
+    .protopirate_refresh_protocol_registry = protopirate_refresh_protocol_registry,
+    .protopirate_preset_init = protopirate_preset_init,
+};
 
 void protopirate_scene_receiver_config_on_enter(void* context) {
     ProtoPirateApp* app = context;
 
-    if(!config_plugin_load(app)) {
+    if(!shared_plugin_load(app, ProtoPirateSharedPluginsConfig, NULL)) {
         notification_message(app->notifications, &sequence_error);
         scene_manager_previous_scene(app->scene_manager);
         return;
     }
-
-    app->config_plugin->on_enter(app);
+    app->config_plugin->set_host_api(&protopirate_config_scene_host_api);
+    //We have to grab this from the scene manager, from inside the plugin it just doesnt work!
+    bool show_lock_keyboard =
+        (scene_manager_get_scene_state(app->scene_manager, ProtoPirateSceneReceiverConfig) == 1);
+    app->config_plugin->on_enter(app, show_lock_keyboard);
 }
 
 bool protopirate_scene_receiver_config_on_event(void* context, SceneManagerEvent event) {
@@ -30,5 +40,5 @@ bool protopirate_scene_receiver_config_on_event(void* context, SceneManagerEvent
 void protopirate_scene_receiver_config_on_exit(void* context) {
     ProtoPirateApp* app = context;
 
-    config_plugin_unload(app);
+    shared_plugin_unload(app, ProtoPirateSharedPluginsConfig);
 }

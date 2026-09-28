@@ -10,73 +10,294 @@
 #include "helpers/protopirate_radio.h"
 #include <string.h>
 
-#define TAG "ProtoPirateApp"
+#define TAG "PPApp"
 
 // -----------------------------------------------------------------------------
 // Plugin load / unload
 // -----------------------------------------------------------------------------
-void config_plugin_unload(ProtoPirateApp* app) {
-    furi_check(app);
+const FlipperAppPluginDescriptor* load_plugin_fal(
+    FlipperApplication** fal_app,
+    const char* plugin_path,
+    const char* application_id,
+    uint32_t api_version) {
+    const FlipperAppPluginDescriptor* app_descriptor;
 
-    app->config_plugin = NULL;
+    bool return_value = false;
+    do {
+        FlipperApplicationPreloadStatus preload_res =
+            flipper_application_preload(*fal_app, plugin_path);
+        if(preload_res != FlipperApplicationPreloadStatusSuccess) {
+            FURI_LOG_E(TAG, "Failed to preload plugin: %s", plugin_path);
+            break;
+        }
 
-    if(app->plugin_manager) {
-        plugin_manager_free(app->plugin_manager);
-        app->plugin_manager = NULL;
-    }
+        if(!flipper_application_is_plugin(*fal_app)) {
+            FURI_LOG_E(TAG, "Plugin file is not a library");
+            break;
+        }
 
-    if(app->plugin_resolver) {
-        composite_api_resolver_free(app->plugin_resolver);
-        app->plugin_resolver = NULL;
+        FlipperApplicationLoadStatus load_status = flipper_application_map_to_memory(*fal_app);
+        if(load_status != FlipperApplicationLoadStatusSuccess) {
+            FURI_LOG_E(TAG, "Failed to load plugin file");
+            break;
+        }
+
+        FURI_LOG_D(TAG, "is mapped to memory");
+        app_descriptor = flipper_application_plugin_get_descriptor(*fal_app);
+        if(strcmp(app_descriptor->appid, application_id) != 0) {
+            FURI_LOG_E(TAG, "Application id mismatch %s", application_id);
+            break;
+        }
+
+        if(app_descriptor->ep_api_version != api_version) {
+            FURI_LOG_E(TAG, "API version mismatch %lu", api_version);
+            break;
+        }
+
+        FURI_LOG_I(
+            TAG,
+            "Loaded plugin for appid '%s', API %lu",
+            app_descriptor->appid,
+            app_descriptor->ep_api_version);
+        return_value = true;
+    } while(false);
+
+    //Free the applciation if there was an error, otherwise return the app descriptor.
+    if(return_value) {
+        return app_descriptor;
+    } else {
+        if(*fal_app) {
+            flipper_application_free(*fal_app);
+            *fal_app = NULL;
+        }
+        return NULL;
     }
 }
 
-bool config_plugin_load(ProtoPirateApp* app) {
-    furi_check(app);
-
-    if(app->config_plugin) return true;
-
-    if(app->plugin_manager || app->plugin_resolver) {
-        config_plugin_unload(app);
+void shared_plugin_unload(ProtoPirateApp* app, ProtoPirateSharedPlugin plugin_type) {
+    //Clear the invalid reference to the plugin.
+    FlipperApplication** fal_needs_free = NULL;
+    switch(plugin_type) {
+    case ProtoPirateSharedPluginsConfig: {
+        fal_needs_free = &app->plugin_flipper_application;
+        app->config_plugin = NULL;
+        break;
+    }
+    case ProtoPirateSharedPluginsSavedInfo: {
+        fal_needs_free = &app->plugin_flipper_application;
+        app->saved_info_plugin = NULL;
+        break;
+    }
+    case ProtoPirateSharedPluginsAbout: {
+        fal_needs_free = &app->plugin_flipper_application;
+        app->about_plugin = NULL;
+        break;
+    }
+#ifdef ENABLE_EMULATE_FEATURE
+    case ProtoPirateSharedPluginsEmulate: {
+        fal_needs_free = &app->plugin_flipper_application;
+        app->emulate_plugin = NULL;
+        break;
+    }
+#endif
+    case ProtoPirateSharedPluginsToolScene:
+    case ProtoPirateSharedPluginsSubDecode:
+#ifdef ENABLE_TIMING_TUNER_SCENE
+    case ProtoPirateSharedPluginsTimingTuner:
+#endif
+    {
+        fal_needs_free = &app->tool_scene_plugin_flipper_application;
+        app->tool_scene_plugin = NULL;
+        break;
+    }
+    case ProtoPirateSharedPluginsPSABruteforce: {
+        fal_needs_free = &app->psa_bf_plugin_flipper_application;
+        app->psa_bf_plugin = NULL;
+        break;
+    }
+    case ProtoPirateSharedPluginsTXRX: {
+        fal_needs_free = &app->txrx->protocol_plugin_flipper_application;
+        app->txrx->protocol_plugin = NULL;
+        break;
+    }
+    default:
+        return;
     }
 
-    CompositeApiResolver* resolver = composite_api_resolver_alloc();
-    if(!resolver) {
-        FURI_LOG_E(TAG, "Failed to allocate config plugin resolver");
+    //Free the flipper application.
+    if(*fal_needs_free) {
+        flipper_application_free(*fal_needs_free);
+        *fal_needs_free = NULL;
+    }
+}
+
+bool shared_plugin_load(
+    ProtoPirateApp* app,
+    ProtoPirateSharedPlugin plugin_type,
+    const char* txrx_path) {
+    //Get the APPID and API VERSION for the Plugin we are loading.
+    const char* application_id = NULL;
+    const char* plugin_path = NULL;
+    uint32_t api_version = 0;
+    FlipperApplication** fal_needs_alloc = NULL;
+
+    switch(plugin_type) {
+    case ProtoPirateSharedPluginsConfig: {
+        if(app->config_plugin) return true;
+        application_id = PROTOPIRATE_CONFIG_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_CONFIG_PLUGIN_API_VERSION;
+        plugin_path = CONFIG_PLUGIN_PATH;
+        fal_needs_alloc = &app->plugin_flipper_application;
+        break;
+    }
+    case ProtoPirateSharedPluginsSavedInfo: {
+        if(app->saved_info_plugin) return true;
+        application_id = PROTOPIRATE_SAVED_INFO_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_SAVED_INFO_PLUGIN_API_VERSION;
+        plugin_path = SAVED_INFO_PLUGIN_PATH;
+        fal_needs_alloc = &app->plugin_flipper_application;
+        break;
+    }
+    case ProtoPirateSharedPluginsAbout: {
+        if(app->about_plugin) return true;
+        application_id = PROTOPIRATE_ABOUT_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_ABOUT_PLUGIN_API_VERSION;
+        plugin_path = ABOUT_PLUGIN_PATH;
+        fal_needs_alloc = &app->plugin_flipper_application;
+        break;
+    }
+#ifdef ENABLE_EMULATE_FEATURE
+    case ProtoPirateSharedPluginsEmulate: {
+        if(app->emulate_plugin) return true;
+        application_id = PROTOPIRATE_EMULATE_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_EMULATE_PLUGIN_API_VERSION;
+        plugin_path = EMULATE_PLUGIN_PATH;
+        fal_needs_alloc = &app->plugin_flipper_application;
+        break;
+    }
+#endif
+    case ProtoPirateSharedPluginsSubDecode: {
+        if(app->tool_scene_plugin) return true;
+        application_id = PROTOPIRATE_TOOL_SCENE_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_TOOL_SCENE_PLUGIN_API_VERSION;
+        plugin_path = SUB_DECODE_PLUGIN_PATH;
+        fal_needs_alloc = &app->tool_scene_plugin_flipper_application;
+        break;
+    }
+#ifdef ENABLE_TIMING_TUNER_SCENE
+    case ProtoPirateSharedPluginsTimingTuner: {
+        if(app->tool_scene_plugin) return true;
+        application_id = PROTOPIRATE_TOOL_SCENE_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_TOOL_SCENE_PLUGIN_API_VERSION;
+        plugin_path = TIMING_TUNER_PLUGIN_PATH;
+        fal_needs_alloc = &app->tool_scene_plugin_flipper_application;
+        break;
+    }
+#endif
+    case ProtoPirateSharedPluginsPSABruteforce: {
+        if(app->psa_bf_plugin) return true;
+        application_id = PROTOPIRATE_PSA_BF_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_PSA_BF_PLUGIN_API_VERSION;
+        plugin_path = PSA_BF_PLUGIN_PATH;
+        fal_needs_alloc = &app->psa_bf_plugin_flipper_application;
+        break;
+    }
+    case ProtoPirateSharedPluginsTXRX: {
+        if(app->txrx->protocol_plugin) return true;
+        application_id = PROTOPIRATE_PROTOCOL_PLUGIN_APP_ID;
+        api_version = PROTOPIRATE_PROTOCOL_PLUGIN_API_VERSION;
+        plugin_path = txrx_path;
+        fal_needs_alloc = &app->txrx->protocol_plugin_flipper_application;
+        break;
+    }
+    default:
         return false;
     }
-    composite_api_resolver_add(resolver, firmware_api_interface);
 
-    PluginManager* manager = plugin_manager_alloc(
-        PROTOPIRATE_CONFIG_PLUGIN_APP_ID,
-        PROTOPIRATE_CONFIG_PLUGIN_API_VERSION,
-        composite_api_resolver_get(resolver));
-    if(!manager) {
-        FURI_LOG_E(TAG, "Failed to allocate config plugin manager");
-        composite_api_resolver_free(resolver);
-        return false;
-    }
+    FURI_LOG_D(TAG, "Loading plugin: %s", plugin_path);
 
-    PluginManagerError error = plugin_manager_load_single(manager, CONFIG_PLUGIN_PATH);
-    if(error != PluginManagerErrorNone) {
-        FURI_LOG_E(TAG, "Failed to load config plugin %s: %d", CONFIG_PLUGIN_PATH, (int)error);
-        plugin_manager_free(manager);
-        composite_api_resolver_free(resolver);
-        return false;
-    }
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    FlipperApplication* fal_app = flipper_application_alloc(storage, firmware_api_interface);
+    bool return_value = false;
+    do {
+        //Load the FAP
+        const FlipperAppPluginDescriptor* app_descriptor =
+            load_plugin_fal(&fal_app, plugin_path, application_id, api_version);
+        if(app_descriptor) {
+            //Get the Plugin and assign it.
+            if(plugin_type == ProtoPirateSharedPluginsConfig) {
+                const ProtoPirateConfigPlugin* plugin_config = app_descriptor->entry_point;
+                if(!plugin_config || !plugin_config->on_enter) {
+                    FURI_LOG_E(TAG, "Config plugin entry point is invalid");
+                } else {
+                    app->config_plugin = plugin_config;
+                    return_value = true;
+                }
+            } else if(plugin_type == ProtoPirateSharedPluginsSavedInfo) {
+                const ProtoPirateSavedInfoPlugin* plugin_saved_info = app_descriptor->entry_point;
+                if(!plugin_saved_info || !plugin_saved_info->on_enter) {
+                    FURI_LOG_E(TAG, "Saved Info plugin entry point is invalid");
+                } else {
+                    app->saved_info_plugin = plugin_saved_info;
+                    return_value = true;
+                }
+            } else if(plugin_type == ProtoPirateSharedPluginsAbout) {
+                const ProtoPirateAboutPlugin* plugin_about = app_descriptor->entry_point;
+                if(!plugin_about || !plugin_about->on_enter) {
+                    FURI_LOG_E(TAG, "About plugin entry point is invalid");
+                } else {
+                    app->about_plugin = plugin_about;
+                    return_value = true;
+                }
+            }
+#ifdef ENABLE_EMULATE_FEATURE
+            else if(plugin_type == ProtoPirateSharedPluginsEmulate) {
+                const ProtoPirateEmulatePlugin* plugin_emulate = app_descriptor->entry_point;
+                if(!plugin_emulate || !plugin_emulate->on_enter) {
+                    FURI_LOG_E(TAG, "Emulate plugin entry point is invalid");
+                } else {
+                    app->emulate_plugin = plugin_emulate;
+                    return_value = true;
+                }
+            }
+#endif
+            else if(
+                plugin_type == ProtoPirateSharedPluginsSubDecode
+#ifdef ENABLE_TIMING_TUNER_SCENE
+                || plugin_type == ProtoPirateSharedPluginsTimingTuner
+#endif
+            ) {
+                const ProtoPirateToolScenePlugin* plugin_tool_scene = app_descriptor->entry_point;
+                if(!plugin_tool_scene || !plugin_tool_scene->on_enter) {
+                    FURI_LOG_E(TAG, "Tool Scene plugin entry point is invalid");
+                } else {
+                    app->tool_scene_plugin = plugin_tool_scene;
+                    return_value = true;
+                }
+            } else if(plugin_type == ProtoPirateSharedPluginsPSABruteforce) {
+                const ProtoPiratePsaBfPlugin* plugin_psa_bf = app_descriptor->entry_point;
+                if(!plugin_psa_bf || !plugin_psa_bf->needs_bruteforce) {
+                    FURI_LOG_E(TAG, "PSA plugin entry needs_bruteforce is invalid");
+                } else {
+                    app->psa_bf_plugin = plugin_psa_bf;
+                    return_value = true;
+                }
+            } else if(plugin_type == ProtoPirateSharedPluginsTXRX) {
+                const ProtoPirateProtocolPlugin* plugin_txrx = app_descriptor->entry_point;
+                if(!plugin_txrx || !plugin_txrx->registry) {
+                    FURI_LOG_E(TAG, "Protocol plugin registry entry is invalid");
+                } else {
+                    app->txrx->protocol_plugin = plugin_txrx;
+                    return_value = true;
+                }
+            }
+        }
+    } while(false);
 
-    const ProtoPirateConfigPlugin* plugin = plugin_manager_get_ep(manager, 0U);
-    if(!plugin || !plugin->on_enter) {
-        FURI_LOG_E(TAG, "Config plugin entry point is invalid");
-        plugin_manager_free(manager);
-        composite_api_resolver_free(resolver);
-        return false;
-    }
-
-    app->plugin_resolver = resolver;
-    app->plugin_manager = manager;
-    app->config_plugin = plugin;
-    return true;
+    //Free the plugin if there was an error, otherwise we are done!
+    if(fal_needs_alloc) *fal_needs_alloc = fal_app;
+    furi_record_close(RECORD_STORAGE);
+    return return_value;
 }
 
 static bool protopirate_app_custom_event_callback(void* context, uint32_t event) {
@@ -140,14 +361,13 @@ ProtoPirateApp* protopirate_app_alloc() {
         app->view_dispatcher, ProtoPirateViewSubmenu, submenu_get_view(app->submenu));
 
     app->save_protocol = NULL;
-    app->save_from_saved_info = false;
     app->save_history_idx = 0;
     app->emulate_disabled_for_loaded = false;
-    memset(app->save_filename, 0, sizeof(app->save_filename));
+    app->save_filename = NULL;
 
     // File Browser path
-    app->file_path = furi_string_alloc();
-    furi_string_set(app->file_path, PROTOPIRATE_APP_FOLDER);
+    app->file_path = malloc(strlen(PROTOPIRATE_APP_FOLDER) + 1);
+    snprintf(app->file_path, strlen(PROTOPIRATE_APP_FOLDER) + 1, PROTOPIRATE_APP_FOLDER);
 
     // Load saved settings
     ProtoPirateSettings settings;
@@ -169,6 +389,7 @@ ProtoPirateApp* protopirate_app_alloc() {
     app->setting = subghz_setting_alloc();
     app->loaded_file_path = NULL;
     app->start_tx_time = 0;
+    app->deferred_storage_timer = NULL;
     subghz_setting_load(app->setting, EXT_PATH("subghz/assets/setting_user"));
 
     // Apply loaded frequency and preset, with validation
@@ -221,33 +442,59 @@ ProtoPirateApp* protopirate_app_alloc() {
         settings.auto_save,
         settings.hopping_enabled);
 
-    config_plugin_load(app);
-    app->car_models_count = app->config_plugin->car_model_get_count();
+    // Null out plugin pointers just in case.
+    app->plugin_flipper_application = NULL;
+    app->config_plugin = NULL;
+    app->saved_info_plugin = NULL;
+    app->about_plugin = NULL;
+    app->plugin_flipper_application = NULL;
+    app->psa_bf_plugin = NULL;
+    app->tool_scene_plugin_flipper_application = NULL;
+    app->tool_scene_plugin = NULL;
+
+    //Load the models database, get the count of the models for the list.
+    if(shared_plugin_load(app, ProtoPirateSharedPluginsConfig, NULL) && app->config_plugin) {
+        app->car_models_count = app->config_plugin->car_model_get_count();
+    } else {
+        notification_message(app->notifications, &sequence_error);
+        app->car_models_count = 0;
+    }
     app->selected_model = malloc(sizeof(ProtoPirateCarModel));
-    app->selected_model->name = furi_string_alloc();
+    app->selected_model->name = NULL;
     app->selected_model->preset = NULL; // important initialization
     app->selected_model->index = 0; // optional but clean
     app->variable_item_list = NULL;
 
     //Grab selected car model.
-    if(settings.car_model_index) {
-        app->config_plugin->car_model_get_by_index(
-            app->selected_model, settings.car_model_index, app->car_models_count, app->setting);
-        app->selected_model->last_preset_index = settings.preset_index;
+    if(app->config_plugin) {
+        if(settings.car_model_index) {
+            //Get the selected car model.
+            app->config_plugin->car_model_get_by_index(
+                app->selected_model, settings.car_model_index, app->car_models_count, app->setting);
+            app->selected_model->last_preset_index = settings.preset_index;
 
-        protopirate_preset_init(
-            app,
-            furi_string_get_cstr(app->selected_model->preset->name),
-            app->selected_model->preset->frequency,
-            app->selected_model->preset->data,
-            app->selected_model->preset->data_size);
+            //Preset for the selected model...
+            protopirate_preset_init(
+                app,
+                furi_string_get_cstr(app->selected_model->preset->name),
+                app->selected_model->preset->frequency,
+                app->selected_model->preset->data,
+                app->selected_model->preset->data_size);
+        } else {
+            //This will return Select a model or No Models in Database
+            app->config_plugin->car_model_get_by_index(
+                app->selected_model, 0, app->car_models_count, app->setting);
+
+            //Preset set in Config.
+            protopirate_preset_init(app, preset_name, frequency, preset_data, preset_data_size);
+        }
+
+        //Kill the config plugin now.
+        shared_plugin_unload(app, ProtoPirateSharedPluginsConfig);
     } else {
-        app->config_plugin->car_model_get_by_index(
-            app->selected_model, 0, app->car_models_count, app->setting);
-
+        //Preset set in Config.
         protopirate_preset_init(app, preset_name, frequency, preset_data, preset_data_size);
     }
-    config_plugin_unload(app);
 
     // Apply hopping state from settings
     app->txrx->hopper_state = settings.hopping_enabled ? ProtoPirateHopperStateRunning :
@@ -301,7 +548,7 @@ void protopirate_app_free(ProtoPirateApp* app) {
     }
 
     //Free the Model Name
-    furi_string_free(app->selected_model->name);
+    if(app->selected_model->name) free(app->selected_model->name);
     app->selected_model->index = 0;
 
     //Free the preset information.
@@ -345,15 +592,20 @@ void protopirate_app_free(ProtoPirateApp* app) {
 
     if(app->loaded_file_path) {
         FURI_LOG_D(TAG, "Freeing loaded_file_path");
-        furi_string_free(app->loaded_file_path);
+        free(app->loaded_file_path);
         app->loaded_file_path = NULL;
     }
 
     protopirate_views_free(app);
 
+    if(app->save_filename) {
+        free(app->save_filename);
+        app->save_filename = NULL;
+    }
+
     if(app->file_path) {
         FURI_LOG_D(TAG, "Freeing file_path");
-        furi_string_free(app->file_path);
+        free(app->file_path);
         app->file_path = NULL;
     }
 
@@ -393,6 +645,7 @@ void protopirate_app_free(ProtoPirateApp* app) {
 }
 
 int32_t protopirate_app(char* p) {
+    //Stop charging while running the app.
     furi_hal_power_suppress_charge_enter();
 
     ProtoPirateApp* protopirate_app = protopirate_app_alloc();
@@ -403,32 +656,33 @@ int32_t protopirate_app(char* p) {
 
     // Handle Command line PSF that may have been passed to us
     bool load_saved = (p && strlen(p));
-    if(load_saved) protopirate_app->loaded_file_path = furi_string_alloc_set(p);
+    if(load_saved) {
+        protopirate_app->loaded_file_path = malloc(strlen(p) + 1);
+        snprintf(protopirate_app->loaded_file_path, strlen(p) + 1, p);
+    }
+
+//We now jump straight to emulate scene from Browser.
+#ifdef ENABLE_EMULATE_FEATURE
+    scene_manager_next_scene(
+        protopirate_app->scene_manager,
+        (load_saved) ? ((protopirate_app->emulate_feature_enabled) ? ProtoPirateSceneEmulate :
+                                                                     ProtoPirateSceneSavedInfo) :
+                       ProtoPirateSceneStart);
+#else
     scene_manager_next_scene(
         protopirate_app->scene_manager,
         (load_saved) ? ProtoPirateSceneSavedInfo : ProtoPirateSceneStart);
-
-    //We now jump straight to emulate scene from Browser. If the user wanted the key to look at, just click back.
-    if(load_saved) {
-#ifdef ENABLE_EMULATE_FEATURE
-        if(protopirate_app->emulate_feature_enabled) {
-            view_dispatcher_send_custom_event(
-                protopirate_app->view_dispatcher, ProtoPirateCustomEventSavedInfoEmulate);
-            notification_message(protopirate_app->notifications, &sequence_success);
-        } else {
 #endif
-            view_dispatcher_send_custom_event(
-                protopirate_app->view_dispatcher, ProtoPirateCustomEventReceiverInfoSave);
-#ifdef ENABLE_EMULATE_FEATURE
-        }
-#endif
+    //Pop up the beep if we are startng emulate.
+    if(load_saved && protopirate_app->emulate_feature_enabled) {
+        notification_message(protopirate_app->notifications, &sequence_success);
     }
 
+    //Run the App
     view_dispatcher_run(protopirate_app->view_dispatcher);
 
+    //Free the App and allow chargin again.
     protopirate_app_free(protopirate_app);
-
     furi_hal_power_suppress_charge_exit();
-
     return 0;
 }

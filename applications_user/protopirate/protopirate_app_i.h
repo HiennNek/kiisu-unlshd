@@ -22,8 +22,6 @@
 #include <lib/subghz/transmitter.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/subghz_file_encoder_worker.h>
-#include <lib/flipper_application/plugins/plugin_manager.h>
-#include <lib/flipper_application/plugins/composite_resolver.h>
 #include <dialogs/dialogs.h>
 #include "defines.h"
 #include "protocols/protocols_common.h"
@@ -33,6 +31,8 @@
 #include "scenes/plugins/protopirate_emulate_plugin.h"
 #endif
 #include "scenes/plugins/protopirate_config_plugin.h"
+#include "scenes/plugins/protopirate_saved_info_plugin.h"
+#include "scenes/plugins/protopirate_about_plugin.h"
 #include "scenes/plugins/protopirate_psa_bf_plugin.h"
 #include "scenes/plugins/protopirate_tool_scene_plugin.h"
 #include "helpers/protopirate_views.h"
@@ -43,7 +43,15 @@
 #include <loader/firmware_api/firmware_api.h>
 #include "helpers/protopirate_settings.h"
 
-#define CONFIG_PLUGIN_PATH APP_ASSETS_PATH("plugins/protopirate_config_plugin.fal")
+#define CONFIG_PLUGIN_PATH     APP_ASSETS_PATH("plugins/pp_config.fal")
+#define SAVED_INFO_PLUGIN_PATH APP_ASSETS_PATH("plugins/pp_saved_info.fal")
+#define ABOUT_PLUGIN_PATH      APP_ASSETS_PATH("plugins/pp_about.fal")
+#define EMULATE_PLUGIN_PATH    APP_ASSETS_PATH("plugins/pp_emulate.fal")
+#define SUB_DECODE_PLUGIN_PATH APP_ASSETS_PATH("plugins/pp_sub_decode.fal")
+#ifdef ENABLE_TIMING_TUNER_SCENE
+#define TIMING_TUNER_PLUGIN_PATH APP_ASSETS_PATH("plugins/pp_timing_tuner.fal")
+#endif
+#define PSA_BF_PLUGIN_PATH APP_ASSETS_PATH("plugins/pp_bf.fal")
 
 #define PROTOPIRATE_KEYSTORE_DIR_NAME APP_ASSETS_PATH("encrypted")
 
@@ -55,8 +63,7 @@ typedef struct ProtoPirateTxRx {
     SubGhzReceiver* receiver;
     SubGhzRadioPreset* preset;
     const SubGhzProtocolRegistry* protocol_registry;
-    CompositeApiResolver* plugin_resolver;
-    PluginManager* protocol_plugin_manager;
+    FlipperApplication* protocol_plugin_flipper_application;
     const ProtoPirateProtocolPlugin* protocol_plugin;
     ProtoPirateProtocolRegistryRoute protocol_registry_route;
     ProtoPirateHistory* history;
@@ -69,6 +76,7 @@ typedef struct ProtoPirateTxRx {
     uint16_t idx_menu_chosen;
 } ProtoPirateTxRx;
 
+typedef struct ProtoPirateConfigPlugin ProtoPirateConfigPlugin;
 struct ProtoPirateApp {
     Gui* gui;
     ViewDispatcher* view_dispatcher;
@@ -80,27 +88,27 @@ struct ProtoPirateApp {
     Widget* widget;
     TextInput* text_input;
     View* view_about;
-    FuriString* file_path;
+    char* file_path;
     ProtoPirateReceiver* protopirate_receiver;
+    FuriTimer* deferred_storage_timer;
     ProtoPirateTxRx* txrx;
     SubGhzSetting* setting;
     ProtoPirateLock lock;
-    FuriString* loaded_file_path;
-    bool auto_save;
-    bool check_saved;
-    bool sound;
-    bool datetime_filenames;
-    bool radio_initialized;
+    char* loaded_file_path;
+    uint8_t deferred_storage_in_progress : 1;
+    uint8_t auto_save                    : 1;
+    uint8_t check_saved                  : 1;
+    uint8_t sound                        : 1;
+    uint8_t datetime_filenames           : 1;
+    uint8_t radio_initialized            : 1;
+    uint8_t emulate_disabled_for_loaded  : 1;
+    uint8_t emulate_feature_enabled      : 1;
     uint32_t start_tx_time;
     uint8_t tx_power;
-    char save_filename[64];
+    char* save_filename;
     FuriString* save_protocol;
     uint16_t save_history_idx;
-    bool save_from_saved_info;
-    bool emulate_disabled_for_loaded;
-    bool emulate_feature_enabled;
-    CompositeApiResolver* plugin_resolver;
-    PluginManager* plugin_manager;
+    FlipperApplication* plugin_flipper_application;
 #ifdef ENABLE_EMULATE_FEATURE
 #define EMULATE_NAV_NONE     0U
 #define EMULATE_NAV_POP      1U
@@ -109,11 +117,11 @@ struct ProtoPirateApp {
     uint8_t emulate_nav_pending;
 #endif
     const ProtoPirateConfigPlugin* config_plugin;
-    CompositeApiResolver* psa_bf_plugin_resolver;
-    PluginManager* psa_bf_plugin_manager;
+    const ProtoPirateSavedInfoPlugin* saved_info_plugin;
+    const ProtoPirateAboutPlugin* about_plugin;
+    FlipperApplication* psa_bf_plugin_flipper_application;
     const ProtoPiratePsaBfPlugin* psa_bf_plugin;
-    CompositeApiResolver* tool_scene_plugin_resolver;
-    PluginManager* tool_scene_plugin_manager;
+    FlipperApplication* tool_scene_plugin_flipper_application;
     const ProtoPirateToolScenePlugin* tool_scene_plugin;
     ProtoPirateToolScenePluginKind tool_scene_plugin_kind;
 #define TOOL_SCENE_NAV_NONE            0U
@@ -124,7 +132,7 @@ struct ProtoPirateApp {
     uint32_t tool_scene_nav_target;
 
     ProtoPirateCarModel* selected_model;
-    uint32_t car_models_count;
+    uint16_t car_models_count;
 };
 
 #ifdef ENABLE_EMULATE_FEATURE
@@ -141,8 +149,27 @@ bool protopirate_tool_scene_on_event(void* app, SceneManagerEvent event);
 void protopirate_tool_scene_on_exit(void* app);
 void protopirate_tool_scene_plugin_release(ProtoPirateApp* app);
 
-bool config_plugin_load(ProtoPirateApp* app);
-void config_plugin_unload(ProtoPirateApp* app);
+typedef enum ProtoPirateSharedPlugin {
+    ProtoPirateSharedPluginsConfig,
+    ProtoPirateSharedPluginsSavedInfo,
+    ProtoPirateSharedPluginsAbout,
+#ifdef ENABLE_EMULATE_FEATURE
+    ProtoPirateSharedPluginsEmulate,
+#endif
+    ProtoPirateSharedPluginsToolScene,
+    ProtoPirateSharedPluginsSubDecode,
+#ifdef ENABLE_TIMING_TUNER_SCENE
+    ProtoPirateSharedPluginsTimingTuner,
+#endif
+    ProtoPirateSharedPluginsPSABruteforce,
+    ProtoPirateSharedPluginsTXRX,
+} ProtoPirateSharedPlugin;
+
+bool shared_plugin_load(
+    ProtoPirateApp* app,
+    ProtoPirateSharedPlugin plugin_type,
+    const char* txrx_path);
+void shared_plugin_unload(ProtoPirateApp* app, ProtoPirateSharedPlugin plugin_type);
 
 void protopirate_app_free(ProtoPirateApp* app);
 
