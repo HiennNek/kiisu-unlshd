@@ -1,11 +1,10 @@
-#include "protopirate_saved_info_plugin.h"
 #include "../../protopirate_app_i.h"
 #include "../../helpers/protopirate_storage.h"
 #include "../../protocols/protocols_common.h"
 #include "../../protocols/protocol_items.h"
-#include "pp_saved_info_icons.h"
+#include "pp_saved_icons.h"
 
-static const ProtoPirateSavedInfoSceneHostApi* g_saved_info_scene_host_api = NULL;
+static const ProtoPirateSharedPluginHostApi* g_saved_info_scene_host_api = NULL;
 
 #define TAG "PPSavedInfoPlugin"
 
@@ -32,9 +31,7 @@ static void plugin_protopirate_scene_saved_info_widget_callback(
     }
 }
 
-void plugin_protopirate_scene_saved_info_on_enter(void* context) {
-    furi_check(context);
-    ProtoPirateApp* app = context;
+void plugin_protopirate_scene_saved_info_on_enter(ProtoPirateApp* app) {
     Storage* storage = NULL;
     FlipperFormat* ff = NULL;
     FuriString* info_str = NULL;
@@ -47,8 +44,12 @@ void plugin_protopirate_scene_saved_info_on_enter(void* context) {
 
     if(!g_saved_info_scene_host_api->ensure_widget(app)) {
         notification_message(app->notifications, &sequence_error);
-        view_dispatcher_send_custom_event(
-            app->view_dispatcher, ProtoPirateCustomEventSavedInfoExit);
+        if(!scene_manager_has_previous_scene(app->scene_manager, ProtoPirateSceneStart)) {
+            view_dispatcher_send_custom_event(
+                app->view_dispatcher, ProtoPirateCustomEventPluginNavigateStopApp);
+        } else
+            view_dispatcher_send_custom_event(
+                app->view_dispatcher, ProtoPirateCustomEventPluginNavigateBack);
         return;
     }
 
@@ -213,25 +214,35 @@ cleanup:
         widget_add_text_scroll_element(app->widget, 0, 0, 128, 50, furi_string_get_cstr(info_str));
 
         bool needs_bf = false;
-        if(offers_bf && g_saved_info_scene_host_api->psa_bf_plugin_ensure_loaded(app) &&
-           app->psa_bf_plugin) {
-            needs_bf = app->psa_bf_plugin->widget_left_should_bruteforce(app, ff);
+        bool error = false;
+        if(offers_bf && g_saved_info_scene_host_api->bruteforce_plugin_ensure_loaded(app) &&
+           app->running_bruteforce_plugin.bruteforce_plugin) {
+            needs_bf =
+                app->running_bruteforce_plugin.bruteforce_plugin->widget_left_should_bruteforce(
+                    app, ff);
+        } else if(offers_bf) {
+            //Show the user the error in the button.
+            widget_add_button_element(app->widget, GuiButtonTypeLeft, "(Error)", NULL, app);
+            needs_bf = false;
+            error = true;
         }
 
-        g_saved_info_scene_host_api->psa_bf_plugin_unload_if_idle(app);
+        g_saved_info_scene_host_api->bruteforce_plugin_unload_if_idle(app);
         if(needs_bf) {
             scene_manager_set_scene_state(app->scene_manager, ProtoPirateSceneSavedInfo, STATE_BF);
+            //Add BF button.
             widget_add_button_element(
                 app->widget,
                 GuiButtonTypeLeft,
                 "BF",
                 plugin_protopirate_scene_saved_info_widget_callback,
                 app);
-        } else {
+        } else if(!error) {
             scene_manager_set_scene_state(
                 app->scene_manager, ProtoPirateSceneSavedInfo, STATE_EMULATE);
 #ifdef ENABLE_EMULATE_FEATURE
             if(app->emulate_feature_enabled && !app->emulate_disabled_for_loaded) {
+                //Add Emulate Button.
                 widget_add_button_element(
                     app->widget,
                     GuiButtonTypeLeft,
@@ -242,6 +253,7 @@ cleanup:
 #endif
         }
 
+        //Add delete button
         widget_add_button_element(
             app->widget,
             GuiButtonTypeRight,
@@ -274,20 +286,31 @@ switch_view:
     FURI_LOG_I(TAG, "=== ENTER DONE ===");
 }
 
-bool plugin_protopirate_scene_saved_info_on_event(void* context, SceneManagerEvent event) {
+bool plugin_protopirate_scene_saved_info_on_event(ProtoPirateApp* context, SceneManagerEvent event) {
     ProtoPirateApp* app = context;
     bool consumed = false;
 
     //load_emu* = false;
     if(event.type == SceneManagerEventTypeTick) {
-        if(app->psa_bf_plugin && app->psa_bf_plugin->is_running(app)) {
-            app->psa_bf_plugin->on_scene_event(app, ProtoPiratePsaBfContextSavedInfo, event);
+        if(app->running_bruteforce_plugin.bruteforce_plugin &&
+           app->running_bruteforce_plugin.bruteforce_plugin->is_running(app)) {
+            app->running_bruteforce_plugin.bruteforce_plugin->on_scene_event(
+                app, ProtoPirateBruteForceContextSavedInfo, event);
             consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
-        return (
-            app->psa_bf_plugin && app->psa_bf_plugin->is_running &&
-            app->psa_bf_plugin->on_scene_event(app, ProtoPiratePsaBfContextReceiverInfo, event));
+        if(app->running_bruteforce_plugin.bruteforce_plugin &&
+           app->running_bruteforce_plugin.bruteforce_plugin->is_running &&
+           app->running_bruteforce_plugin.bruteforce_plugin->on_scene_event(
+               app, ProtoPirateBruteForceContextReceiverInfo, event)) {
+            consumed = true;
+        } else {
+            if(!scene_manager_has_previous_scene(app->scene_manager, ProtoPirateSceneStart)) {
+                view_dispatcher_send_custom_event(
+                    app->view_dispatcher, ProtoPirateCustomEventPluginNavigateStopApp);
+                consumed = true;
+            }
+        }
     } else if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == ProtoPirateCustomEventSavedInfoDelete) {
             FURI_LOG_I(TAG, "Delete requested");
@@ -312,17 +335,23 @@ bool plugin_protopirate_scene_saved_info_on_event(void* context, SceneManagerEve
                     g_saved_info_scene_host_api->storage_delete_file(app->loaded_file_path);
                     notification_message(app->notifications, &sequence_semi_success);
 
-                    view_dispatcher_send_custom_event(
-                        app->view_dispatcher, ProtoPirateCustomEventSavedInfoExit);
+                    if(!scene_manager_has_previous_scene(
+                           app->scene_manager, ProtoPirateSceneStart)) {
+                        view_dispatcher_send_custom_event(
+                            app->view_dispatcher, ProtoPirateCustomEventPluginNavigateStopApp);
+                    } else
+                        view_dispatcher_send_custom_event(
+                            app->view_dispatcher, ProtoPirateCustomEventPluginNavigateBack);
                 }
             }
             consumed = true;
         }
         if(event.event == ProtoPirateCustomEventBruteforceStart ||
            event.event == ProtoPirateCustomEventBruteforceComplete) {
-            if(g_saved_info_scene_host_api->psa_bf_plugin_ensure_loaded(app) &&
-               app->psa_bf_plugin &&
-               app->psa_bf_plugin->on_scene_event(app, ProtoPiratePsaBfContextSavedInfo, event)) {
+            if(g_saved_info_scene_host_api->bruteforce_plugin_ensure_loaded(app) &&
+               app->running_bruteforce_plugin.bruteforce_plugin &&
+               app->running_bruteforce_plugin.bruteforce_plugin->on_scene_event(
+                   app, ProtoPirateBruteForceContextSavedInfo, event)) {
             }
             if(event.event == ProtoPirateCustomEventBruteforceComplete)
                 plugin_protopirate_scene_saved_info_on_enter(app);
@@ -336,7 +365,7 @@ bool plugin_protopirate_scene_saved_info_on_event(void* context, SceneManagerEve
 
             //Send custom event back to the scene, so it can start emulate for us and avoid the crashes.
             view_dispatcher_send_custom_event(
-                app->view_dispatcher, ProtoPirateCustomEventSavedInfoEmulateDelayedStart);
+                app->view_dispatcher, ProtoPirateCustomEventPluginNavigateEmulate);
 
             consumed = true;
         }
@@ -346,15 +375,16 @@ bool plugin_protopirate_scene_saved_info_on_event(void* context, SceneManagerEve
     return consumed;
 }
 
-void saved_info_plugin_set_host_api(const ProtoPirateSavedInfoSceneHostApi* host_api) {
+void saved_info_plugin_set_host_api(const ProtoPirateSharedPluginHostApi* host_api) {
     g_saved_info_scene_host_api = host_api;
 }
 
-static const ProtoPirateSavedInfoPlugin protopirate_saved_info_plugin = {
-    .plugin_name = "Saved",
+static const ProtoPirateSharedPlugin protopirate_saved_info_plugin = {
+    .plugin_name = "",
     .on_enter = plugin_protopirate_scene_saved_info_on_enter,
     .on_event = plugin_protopirate_scene_saved_info_on_event,
     .set_host_api = saved_info_plugin_set_host_api,
+    .release = NULL,
 };
 
 static const FlipperAppPluginDescriptor protopirate_saved_info_plugin_descriptor = {

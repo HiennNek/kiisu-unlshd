@@ -7,7 +7,6 @@
 #define TAG "PPSceneSaved"
 
 void protopirate_scene_saved_on_enter(void* context) {
-    furi_check(context);
     ProtoPirateApp* app = context;
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -46,6 +45,7 @@ void protopirate_scene_saved_on_enter(void* context) {
     furi_string_free(file_path_furi_str);
 
     if(file_selected) {
+        FURI_LOG_D("TEST", "Loading new file");
         if(app->loaded_file_path) {
             free(app->loaded_file_path);
             app->loaded_file_path = NULL;
@@ -56,6 +56,8 @@ void protopirate_scene_saved_on_enter(void* context) {
         furi_string_free(selection);
         scene_manager_next_scene(app->scene_manager, ProtoPirateSceneSavedInfo);
     } else {
+        FURI_LOG_D("TEST", "Leaving");
+
         furi_string_free(selection);
         scene_manager_previous_scene(app->scene_manager);
     }

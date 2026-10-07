@@ -2,24 +2,21 @@
 #include "../protopirate_app_i.h"
 #include "../helpers/protopirate_settings.h"
 
-static const ProtoPirateAboutSceneHostApi protopirate_about_scene_host_api = {
-    .ensure_view_about = protopirate_ensure_view_about,
-    .settings_load = protopirate_settings_load,
-    .settings_save = protopirate_settings_save,
-    .fap_version = FAP_VERSION,
-};
-
 void protopirate_scene_about_on_enter(void* context) {
     ProtoPirateApp* app = context;
 
-    if(!shared_plugin_load(app, ProtoPirateSharedPluginsAbout, NULL)) {
+    if(!shared_plugin_load(
+           &app->running_plugin_flipper_application,
+           &app->running_plugin,
+           ProtoPirateSharedPluginsAbout,
+           NULL)) {
         notification_message(app->notifications, &sequence_error);
         scene_manager_previous_scene(app->scene_manager);
         return;
     }
 
-    app->about_plugin->set_host_api(&protopirate_about_scene_host_api);
-    app->about_plugin->on_enter(app);
+    app->running_plugin.shared_plugin->set_host_api(&protopirate_shared_plugin_host_api);
+    app->running_plugin.shared_plugin->on_enter(app);
 }
 
 bool protopirate_scene_about_on_event(void* context, SceneManagerEvent event) {
@@ -32,7 +29,7 @@ bool protopirate_scene_about_on_event(void* context, SceneManagerEvent event) {
     }
 
     //Handle About event in plugin.
-    return app->about_plugin->on_event(app, event);
+    return app->running_plugin.shared_plugin->on_event(app, event);
 }
 
 void protopirate_scene_about_on_exit(void* context) {
@@ -40,5 +37,5 @@ void protopirate_scene_about_on_exit(void* context) {
     view_set_draw_callback(app->view_about, NULL);
     view_set_input_callback(app->view_about, NULL);
     view_set_context(app->view_about, NULL);
-    shared_plugin_unload(app, ProtoPirateSharedPluginsAbout);
+    shared_plugin_unload(&app->running_plugin_flipper_application, &app->running_plugin);
 }
