@@ -80,7 +80,7 @@ You can find the DFU file in the latest [releases](https://github.com/HiennNek/k
 
 Use [lab.flipper.net](https://lab.flipper.net/). If it does not work, try putting it in DFU mode and flashing the DFU file.
 
-How to enter DFU mode: Unplug your Kiisu, then hold the `OK` button while connecting through USB. Flipper Lab/qFlipper will recognize it as being in DFU mode.
+How to enter DFU mode: Turn off your Kiisu, then hold the `OK` button while connecting through USB. Flipper Lab/qFlipper will recognize it as being in DFU mode.
 </details>
 <details>
 <summary><b>Why doesn't U2F work?</b></summary>
