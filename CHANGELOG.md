@@ -1,6 +1,7 @@
 ## Main changes
-- Current API: 88.19
-- Apps: Build tag (**14oct2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
+- Current API: 88.20
+- SubGHz: **Nice O-Code remotes that send the longer 72bit frame now work** - a captured remote is saved and resent at the length it actually uses, instead of a 52bit one the gate ignores. **Nice O-Code One 433MHz** is the matching Add Manually entry
+- Apps: Build tag (**16oct2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
 - None yet.
 <br><br>
