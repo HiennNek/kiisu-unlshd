@@ -623,10 +623,11 @@ Mhouse is the same Nice receiver family as [Nice Smilo](#nice-smilo), so the pro
 
 You do not need the receiver for this, but **the very first remote always has to be registered with the receiver button.** You need one remote that is already authorised. Below, `OLD` is the authorised remote and `NEW` is the Flipper. Stand within 3 m of the gate or garage receiver.
 
-1. Open your new remote file, press and hold `Send` for at least 5 seconds, then release
+1. Open your new remote file, press and hold `Send` for at least 5 seconds - 7 seconds on an OXIBD receiver - then release
 2. On the `OLD` remote, press its button 3 times slowly
 3. Press `Send` on the Flipper slowly, then release
-4. Done?
+4. Wait 10 seconds, then press `Send` to test that it opens your gate or garage
+5. Done?
 
 ### With access to the receiver box
 
@@ -666,11 +667,14 @@ O-Code is Nice FloR-S keyed with a 16 bit **installer code (IC)**, one value sha
 
 That leaves two ways round:
 
-- **For a system of your own**, the plain `Nice O-Code 433MHz` entry makes up an installer code along with the serial, and you register the remote with the receiver button like any other first remote.
+- **For a system of your own**, the plain `Nice O-Code 433MHz` entry makes up an installer code along with the serial - but a factory receiver will not take it at the button, so register a plain [Nice One](#nice-one) remote first (see the note below).
 - **For a system that is already installed**, the remote has to carry that installation's installer code. Recover it from a remote that already works with the **`Nice O-Code` app** (`Apps` -> `Sub-GHz`): press the remote's button 4 or more times, do not hold it, and the app brute forces the code out of the captures. Then either
   - press **Right (`New`)** on the app's result screen, which writes a remote with that same installer code and button but a serial and counter of its own - the one to register with the receiver, and
   - press `Save` for a plain clone of the remote you captured, useful for testing but it fights your original over the counter, or
   - enter the code by hand under `Add Manually` -> `Advanced` if you already know it.
+
+> [!NOTE]
+> Tested on a factory-fresh OXIBD: in mode I the receiver **ignores O-Code frames completely** - no led flash, nothing memorised - whatever installer code they carry, while a plain `Nice One` remote is memorised at once. The installer code lives in the receiver too and only an O-Box writes it there, so on an untouched receiver the plain [Nice Flor S](#nice-flor-s) / [Nice One](#nice-one) entries are the ones that register at the button. The O-Code entries are for an installation an installer has already keyed.
 
 The app can also work from a file instead of the air: `Decode RAW file` on its menu reads a RAW `.sub` you captured earlier and runs the same recovery on it.
 
@@ -678,11 +682,11 @@ The app can also work from a file instead of the air: `Decode RAW file` on its m
 
 A Nice installer can enrol a remote **without touching the receiver at all**, by loading the receiver's **certificate** into the remote with an O-Box. The certificate is a per-receiver secret that ships as a sealed coupon in the receiver's box; it has nothing to do with the installer code, and knowing one tells you nothing about the other.
 
-A remote carrying a certificate sends a longer **112 bit** frame - an ordinary 72 bit frame with the certificate appended - mixed in among its normal frames, and **only for its first twenty uses**. The receiver enrols the remote on its own while that is going on, after which the remote drops to 72 bit frames and stays there forever.
+A remote carrying a certificate sends a longer **112 bit** frame - an ordinary 72 bit frame with the certificate appended - mixed in among its normal frames, and **only for its first twenty uses**. On air the certificate is masked with the sending remote's own serial, so two remotes of the same gate carry the same secret behind two different numbers; the Flipper shows and stores the receiver's own value and does the masking itself. The receiver enrols the remote on its own while that is going on, after which the remote drops to 72 bit frames and stays there forever.
 
-**Reading a certificate off a remote.** Capture a remote that is still inside its twenty uses, with `SubGHz` -> `Read` or with the `Nice O-Code` app. Both show it as `Cert:` once a 112 bit frame arrives, but only the app carries it over: it shows the certificate next to the recovered installer code and writes it into the remote you save with `New`. From `Read` you have to write the six digits down yourself.
+**Reading a certificate off a remote.** Capture a remote that is still inside its twenty uses with the `Nice O-Code` app. Un-masking needs the remote's serial, so the certificate only appears once the app has brute forced the installer code - it then shows it next to the code and writes it into the remote you save with `New`. `SubGHz` -> `Read` marks the frame as 112 bit but cannot show the certificate without that code.
 
-**Making a remote that enrols itself.** Use `Add Manually` -> `Nice O-Code+Crt 433MHz`. It asks for the serial, button and counter, then the installer code, then the certificate. The remote it writes broadcasts the certificate for twenty uses exactly as an original does, so it registers itself on any receiver that certificate belongs to.
+**Making a remote that enrols itself.** Use `Add Manually` -> `Nice O-Code+Crt 433MHz`. It asks for the serial, button and counter, then the installer code, then the certificate - the receiver's own, the same six digits for every remote you make for that gate. The remote it writes broadcasts the certificate for twenty uses exactly as an original does, so it registers itself on any receiver that certificate belongs to.
 
 > [!NOTE]
 > A certificate only helps if it is *that* receiver's own. There is no way to read one off the air from a receiver, and a remote that has used up its twenty transmissions no longer sends it.

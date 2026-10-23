@@ -31,6 +31,8 @@
 #include <toolbox/protocols/protocol_dict.h>
 #include <toolbox/path.h>
 #include <lfrfid/lfrfid_dict_file.h>
+#include <lfrfid/tools/t5577_file.h>
+#include <flipper_application/application_manifest.h>
 #include <lfrfid/lfrfid_settings.h>
 #include <lfrfid/lfrfid_write_targets.h>
 #include <lfrfid/protocols/lfrfid_protocols.h>
@@ -48,8 +50,8 @@
 #define LFRFID_APP_FILENAME_EXTENSION        ".rfid"
 #define LFRFID_APP_SHADOW_FILENAME_EXTENSION ".shd"
 
-#define LFRFID_APP_RAW_ASK_EXTENSION ".ask.raw"
-#define LFRFID_APP_RAW_PSK_EXTENSION ".psk.raw"
+#define LFRFID_APP_RAW_ASK_EXTENSION    ".ask.raw"
+#define LFRFID_APP_RAW_PSK_EXTENSION    ".psk.raw"
 #define LFRFID_APP_RAW_ASK134_EXTENSION ".ask134.raw"
 
 enum LfRfidCustomEvent {
@@ -66,15 +68,21 @@ enum LfRfidCustomEvent {
     LfRfidEventReadDone,
     LfRfidEventReadOverrun,
     LfRfidEventReadError,
-    LfRfidEventWipeProgress,
     LfRfidEventWriteOK,
     LfRfidEventWriteProtocolCannotBeWritten,
     LfRfidEventWriteNoEnabledTarget,
     LfRfidEventWriteFobCannotBeWritten,
     LfRfidEventWriteTooLongToWrite,
+    LfRfidEventWriteCannotRead,
+    LfRfidEventWriteAlreadyProtected,
+    LfRfidEventWriteKeyNotStored,
+    LfRfidEventWritePasswordNotStored,
+    LfRfidEventWriteProtectionRefused,
+    LfRfidEventWriteProtectionUnchecked,
     LfRfidEventWriteProgress,
     LfRfidEventRpcLoadFile,
     LfRfidEventRpcSessionClose,
+    LfRfidEventBrowseSaved,
 };
 
 typedef enum {
@@ -151,7 +159,16 @@ typedef enum {
 
 bool lfrfid_save_key(LfRfid* app);
 
-bool lfrfid_load_key_from_file_select(LfRfid* app);
+/** Show the saved list. True when a file was picked, with its path in app->file_path. */
+bool lfrfid_select_key_file(LfRfid* app);
+
+/** Hand the dump in app->file_path to the app that reads T5577 dumps.
+ *
+ * On success this app is stopped: the loader runs the other app and then launches this one again
+ * on the saved list. False means nothing was handed over and the caller is still running, with
+ * the reason already on screen.
+ */
+bool lfrfid_run_t5577_app(LfRfid* app);
 
 bool lfrfid_load_raw_key_from_file_select(LfRfid* app);
 
@@ -174,5 +191,3 @@ void lfrfid_popup_timeout_callback(void* context);
 void lfrfid_widget_callback(GuiButtonType result, InputType type, void* context);
 
 void lfrfid_text_input_callback(void* context);
-
-const uint32_t* lfrfid_get_t5577_default_passwords(uint8_t* len);
