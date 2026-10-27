@@ -144,6 +144,13 @@ Here the hidden button has to be sent from **both** remotes:
 - **Create it:** `SubGHz` -> `Add Manually` -> `BFT Mitto 433MHz`
 - **Programming key:** Right Arrow = `0xF` (on the original this is the pin hole on the back, or buttons 1+2 held together)
 
+> [!NOTE]
+> **Newer BFT Mitto remotes make their Seed from the serial**, so a normal `SubGHz` -> `Read` decodes them on the fly - they show up as `KL: BFT` straight away, with no Seed to find.
+>
+> **Other models, especially older ones, have a unique Seed** and read as `KL: Unknown` until you have it. There are only two ways to recover it:
+> - **Hold 2 buttons and read the `Hop` value** - the remote transmits its Seed in the clear, see [Making a full clone instead](#making-a-full-clone-instead-reads-the-seed-off-your-original)
+> - **Seed Capturer + qUnleashed** - see [No hidden button, or it will not send the Seed](#no-hidden-button-or-it-will-not-send-the-seed)
+
 ### With a remote that already works
 
 1. Open your new remote file
@@ -184,7 +191,7 @@ Here the hidden button has to be sent from **both** remotes:
    - `SEED` - the value from step 5
 9. A high counter like `FF F9` jumps past your original remote's current counter. That is what makes the clone work immediately - and what desyncs the original
 
-**Or edit a saved file instead of typing values in.** Save the signal of your original remote (it will be listed as `KL: Unknown`), copy the file to a PC and add these two lines after the `Key: ...` line:
+**Or edit a saved file instead of typing values in.** Save the signal of your original remote (an older remote with a unique Seed is listed as `KL: Unknown`), copy the file to a PC and add these two lines after the `Key: ...` line:
 
 ```
 Seed: 0X XX XX XX
@@ -192,6 +199,10 @@ Manufacture: BFT
 ```
 
 Replace the `X`s with the digits of the Seed from step 4, save, and copy the file back to the Flipper. You now have an exact clone with the same counter - a few presses push it past the original, and from then on only one of the two works at a time.
+
+### No hidden button, or it will not send the Seed
+
+This is only needed for remotes with a unique Seed - a newer remote that already reads as `KL: BFT` has nothing to recover. If you cannot get the original into programming mode - the pin hole is blocked, the buttons are worn, or the remote is not in your hands for long - get the Seed with the **Seed Capturer** app instead. Pick `BFT Mitto` and `433.92 MHz`, press one button repeatedly, then recover the Seed in qUnleashed - see [Recovering a Seed with the Seed Capturer app](#recovering-a-seed-with-the-seed-capturer-app) for the whole procedure. This one needs the recovery step in qUnleashed, so the programming button route above is faster whenever it works.
 
 ---
 
@@ -676,6 +687,9 @@ That leaves two ways round:
 > [!NOTE]
 > Tested on a factory-fresh OXIBD: in mode I the receiver **ignores O-Code frames completely** - no led flash, nothing memorised - whatever installer code they carry, while a plain `Nice One` remote is memorised at once. The installer code lives in the receiver too and only an O-Box writes it there, so on an untouched receiver the plain [Nice Flor S](#nice-flor-s) / [Nice One](#nice-one) entries are the ones that register at the button. The O-Code entries are for an installation an installer has already keyed.
 
+> [!TIP]
+> `COUNTER` is a plain count of presses and the Flipper advances it by one per press, the same as an original Nice remote. The receiver refuses any count **behind** the one it last stored for that serial, and it also refuses one that sits implausibly far behind the remotes it already knows - even for a serial it has never seen. So do **not** leave `COUNTER` near zero. Set it close to, and a little below, the count your working remote is on; the `Nice O-Code` app's `New` does that for you. Do not set it far above, in case the receiver keeps one count for the whole installation. If you have already sent frames from that serial, type a `COUNTER` a little above the highest you sent.
+
 The app can also work from a file instead of the air: `Decode RAW file` on its menu reads a RAW `.sub` you captured earlier and runs the same recovery on it.
 
 ### The certificate, and the 112 bit frame
@@ -686,10 +700,20 @@ A remote carrying a certificate sends a longer **112 bit** frame - an ordinary 7
 
 **Reading a certificate off a remote.** Capture a remote that is still inside its twenty uses with the `Nice O-Code` app. Un-masking needs the remote's serial, so the certificate only appears once the app has brute forced the installer code - it then shows it next to the code and writes it into the remote you save with `New`. `SubGHz` -> `Read` marks the frame as 112 bit but cannot show the certificate without that code.
 
-**Making a remote that enrols itself.** Use `Add Manually` -> `Nice O-Code+Crt 433MHz`. It asks for the serial, button and counter, then the installer code, then the certificate - the receiver's own, the same six digits for every remote you make for that gate. The remote it writes broadcasts the certificate for twenty uses exactly as an original does, so it registers itself on any receiver that certificate belongs to.
+**Making a remote that enrols itself.** Use `Add Manually` -> `Nice O-Code+Crt 433MHz`. It asks for the serial, button and counter, then the installer code, then the certificate - the receiver's own, the same six digits for every remote you make for that gate. Easier still, let the `Nice O-Code` app do all of it: capture a remote that already works, then press **Right (`New`)**, which fills in the installer code, the certificate and a sensible counter by itself.
+
+Then, in range of the gate:
+
+1. Open the file and press the key. Nothing happens. That is normal.
+2. **Keep pressing, about once a second, ten to fifteen times.** The gate opens somewhere around the tenth press - that is the receiver deciding it has heard enough.
+3. After it opens once it is registered for good. Every press from then on works immediately, and it keeps working long after the twenty certificate uses are gone.
+
+> [!IMPORTANT]
+> Two presses is not a failed test. The receiver wants roughly ten before it enrols a remote this way, and the certificate only goes out for the first **twenty** presses - so if you stop at five and come back tomorrow you have spent five of your twenty for nothing. Do the ten to fifteen in one sitting. If all twenty are used up without the gate opening, the remote can never enrol itself; delete it and make a new one.
 
 > [!NOTE]
 > A certificate only helps if it is *that* receiver's own. There is no way to read one off the air from a receiver, and a remote that has used up its twenty transmissions no longer sends it.
+
 
 ### The five ways Nice registers a remote
 
@@ -888,7 +912,7 @@ The remote that starts this has to be stored in the receiver already. Everything
 
 ## Recovering a Seed with the Seed Capturer app
 
-**FAAC SLH**, **Genius** and **Erreka** all build their rolling code from a secret per-installation **Seed**. Without it the Flipper cannot decode those remotes at all - a normal button press reads as `KL: Unknown` or will not decode - and it cannot build a remote the receiver will accept.
+**FAAC SLH**, **Genius**, **Erreka** and **BFT Mitto** all build their rolling code from a secret per-installation **Seed**. Without it the Flipper cannot decode those remotes at all - a normal button press reads as `KL: Unknown` or will not decode - and it cannot build a remote the receiver will accept.
 
 The **Seed Capturer** app collects the raw material a Seed recovery needs. It does not recover the Seed itself and it **never transmits anything** - it only listens and writes a file.
 
@@ -898,13 +922,14 @@ The **Seed Capturer** app collects the raw material a Seed recovery needs. It do
 - **Your remote is a slave, not a master.** On FAAC and Genius only a master remote can transmit the programming code that opens the window for new remotes. A slave cannot, so the master-remote procedure is simply unavailable to you. Again, a clone is the way, and a clone needs the Seed
 - **You cannot get at the receiver.** It is walled in, in a locked box, or not yours to open
 - **Erreka with a shared Seed.** See [Erreka IRIS](#erreka-iris-new) - some installations give every remote the same Seed, and a new remote has to reuse it
+- **Older BFT Mitto without a working programming button.** See [BFT Mitto](#bft-mitto) - newer remotes decode in a normal Read, older ones have a unique Seed that is normally read in the clear from programming mode, and this is the way when that is not possible
 
 ### How to use it
 
 1. Open `Apps` -> `Sub-GHz` -> `Seed Capturer`
 2. Pick `New capture`
-3. Pick your remote type - `FAAC SLH`, `Genius` or `Erreka`
-4. Pick your frequency - `433.92 MHz  AM650` or `868.35 MHz  AM650`
+3. Pick your remote type - `FAAC SLH`, `Genius`, `Erreka` or `BFT Mitto`
+4. Pick your frequency - `433.92 MHz  AM650` or `868.35 MHz  AM650` (`BFT Mitto` offers only `433.92 MHz`)
 5. Press **the same button on the same remote**, over and over. Roughly once a second is fine
 6. Watch the screen fill in:
    - `Fix` - the remote's fixed part. The app locks onto the first one it hears and ignores everything else
@@ -950,7 +975,7 @@ The capture file is only the input. The Seed itself is found by the recovery too
 > If it finds nothing, the capture most likely had a gap in it. The search needs an unbroken run of presses, so capture again and be precise about it: hold the remote right next to the Flipper, press the **same button** and nothing else, one steady press at a time, and check the `Hops` counter moves on **every** press. If a press does not register, hit `Reset` (Left) and start the capture over instead of carrying on.
 
 > [!IMPORTANT]
-> The Seed belongs to the installation, not to one button. **On FAAC SLH and Genius the Seed is different for every button** on the original remote, so capture the button you actually intend to use. On Erreka the Seed is per remote, and sometimes per whole installation.
+> The Seed belongs to the installation, not to one button. **On FAAC SLH and Genius the Seed is different for every button** on the original remote, so capture the button you actually intend to use. On Erreka the Seed is per remote, and sometimes per whole installation. On BFT Mitto the Seed is per remote - newer remotes make it from the serial and need no capture at all, only older ones with a unique Seed do.
 
 ### Once you have the Seed
 
