@@ -1,0 +1,21 @@
+# Changelog
+
+## 1.1
+
+- Let Back out of the Read and Check Reader screens while they are still working, rather than only from the result. The firmware's Loading view consumes every key, Back included, so a read that was going nowhere had to be waited out to the end; its input callback is now replaced with one that releases Back. Leaving early is as safe as leaving a result screen - both scenes already undo in their `on_exit` everything they started, so the worker is stopped, the carrier dropped and both timers cancelled on the way out. On Check Reader the press lands at once, because its step only takes a snapshot of the detector; on Read it waits out the step in flight, and a failing protection check is a sweep of three bit rates, so a second or two can pass before the screen reacts
+
+## 1.0
+
+- Initial release: read, identify and emulate Варта-М intercom keys, and build a complete working key from nothing but the number printed on the fob
+- Read a tag and say what it actually is, separating a genuine key from an EM4100 copy with no password, from a tag holding some other word in block 6, and from a tag that is not EM4100 at all. The ID alone does not answer this, because the anti-copy scheme is the same on every Варта-М key ever made - one shared password and one shared marker word - so what distinguishes a key from a clone is the marker, not the number
+- Send the password only after a known prefix, three refused plain reads and a confirmed-present tag. A T5577 passworded read and a plain write are both 38 bits, so a password sent to a tag that has none is parsed as a write into the addressed block, with the password's top bit landing as that block's lock bit - one-way and unrecoverable
+- Emulate a key as alternating bursts of EM4100 frames and block-6 marker words, never the two interleaved. A marker word is longer than the reader's 13.76 ms listening window so no phase of an interleaved stream fits, and the marker's leading nine `1` bits are a valid EM4100 header, so splicing it into the ID stream stops the reader ever latching an ID. All three burst mixes opened a real reader; a bare EM4100 ID, sent as a control, did not
+- Add `Settings → Emulation` to pick the burst mix, persisted between runs. Hold the Flipper on the reader for about fifteen seconds before trying another - the loop is not synchronised to the reader, so the bursts walk through its listening window a little further each time round, and a mix that looks dead after four seconds has not had a fair trial
+- Add Manually: type an EM4100 ID in by hand, warning rather than refusing when the prefix is not one Варта-М usually issues
+- Open saved `.rfid` keys and `.t5577` dumps from the lfrfid folder. A dump's ID is decoded back out of blocks 1-2 and re-encoded to check it, and a mismatch is refused rather than guessed at
+- Show the five T5577 blocks a key is built from, each labelled with what it is for, so a dump can be checked by eye or a blank written by hand
+- Save a `.t5577` dump for the T5577 app to write onto a blank tag
+- Add Check Reader: hold the Flipper against a reader and it decodes the T5577 command the reader is sending, reporting a Варта-М reader, another password scheme with the password it asked for, or what it heard when neither. It only listens - nothing is transmitted, so pointing it at a reader you do not own cannot change anything
+- Check Reader deliberately has no verdict for "this reader is unprotected". One was built and withdrawn: readers that only read an EM4100 ID differ from each other by two orders of magnitude in carrier disturbance, and the same device measured twice differed sixtyfold on coupling alone, so every threshold that fitted one reader was wrong for the next. Guessing there means telling somebody their door opens with a clone. The only reliable test is the active one - emulate an EM4100 ID and see whether it opens
+- Require a verdict to repeat identically six times before treating it as settled, and label it `Unconfirmed` with no chime when the twelve-second window closes first, so one lucky frame of noise cannot read like six that agreed
+- Show the counts behind any Check Reader verdict, including stalls heard outside the measurable band, so a reader this cannot read is distinguishable from an empty coil rather than looking the same

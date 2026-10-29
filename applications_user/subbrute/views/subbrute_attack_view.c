@@ -8,6 +8,10 @@
 
 #define TAG "SubBruteAttackView"
 
+static void subbrute_attack_view_enter(void* context);
+static void subbrute_attack_view_exit(void* context);
+static void subbrute_attack_view_draw(Canvas* canvas, void* context);
+
 struct SubBruteAttackView {
     View* view;
     SubBruteAttackViewCallback callback;
@@ -38,7 +42,7 @@ void subbrute_attack_view_set_callback(
     instance->context = context;
 }
 
-bool subbrute_attack_view_input(InputEvent* event, void* context) {
+static bool subbrute_attack_view_input(InputEvent* event, void* context) {
     furi_assert(event);
     furi_assert(context);
     SubBruteAttackView* instance = context;
@@ -157,7 +161,7 @@ SubBruteAttackView* subbrute_attack_view_alloc() {
     return instance;
 }
 
-void subbrute_attack_view_enter(void* context) {
+static void subbrute_attack_view_enter(void* context) {
     furi_assert(context);
     SubBruteAttackView* instance = (SubBruteAttackView*)context;
     with_view_model(
@@ -241,7 +245,7 @@ void subbrute_attack_view_init_values(
         true);
 }
 
-void subbrute_attack_view_exit(void* context) {
+static void subbrute_attack_view_exit(void* context) {
     furi_assert(context);
     SubBruteAttackView* instance = context;
 #ifdef FURI_DEBUG
@@ -254,7 +258,7 @@ void subbrute_attack_view_exit(void* context) {
         false);
 }
 
-void subbrute_attack_view_draw(Canvas* canvas, void* context) {
+static void subbrute_attack_view_draw(Canvas* canvas, void* context) {
     furi_assert(context);
     SubBruteAttackViewModel* model = (SubBruteAttackViewModel*)context;
     char buffer[64] = {0};
@@ -323,7 +327,8 @@ void subbrute_attack_view_draw(Canvas* canvas, void* context) {
             canvas, x - icon_width_with_offset, y - icon_v_offset, model->icon);
         // Progress bar
         // Resolution: 128x64 px
-        float progress_value = (float)model->current_step / (float)model->max_value;
+        float progress_value =
+            model->max_value ? (float)model->current_step / (float)model->max_value : 0.0f;
         elements_progress_bar(canvas, 8, 37, 110, progress_value > 1 ? 1 : progress_value);
 
         snprintf(
