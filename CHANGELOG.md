@@ -13,6 +13,7 @@
 - Apps: `Seed Capturer` can decode a saved RAW `.sub` file instead of capturing over the air, and uses an external CC1101 module when one is plugged in
 - Apps: `Seed Capturer` now supports **BFT Mitto** remotes on 433.92 MHz, the same way as Erreka - capture the hops and recover the Seed in qUnleashed
 - SubGHz: **Nero Radio rolling remotes are now decoded and can be replayed as is** - both the normal and the long range modes. Replay only resends the captured parcel and may work just once, as the counter can't be rolled yet. Static Nero Radio remotes are read more reliably and show serial, button and hold counter
+- SubGHz: **Dooya remotes support custom buttons** - Up and Down send a long press, Left and Right a short one, OK resends the captured command. Stop is reachable by capturing it or with the button editor (by @Lechnio | Momentum PR 597)
 - SubGHz Remote: **Sending button is highlighted and last pressed button details are shown** (protocol, frequency, modulation, serial, counter) instead of the D-pad
 - SubGHz Remote: Hold button for endless TX, one click sends full signal (like main SubGHz app), no more forced `Repeat` value
 - SubGHz Remote: RAW is sent in full with one click (Back to stop), repeats while button is held
@@ -29,7 +30,7 @@
 - RFID: **T5577 app - leaving a dump returns to the list it was picked from** instead of the app's start menu, and deleting one lands back in the list without it (by @mishamyte | PR #1188)
 - RFID: **Fix the T5577 app moving a dump when renaming it** - a dump opened from a subfolder or from the archive was written into `/ext/lfrfid`, deleted from where it was, and reported as renamed (by @mishamyte | PR #1188)
 - RFID: T5577 app - a Test Tag backup is deleted once the tag is proven back to what it held, and kept only when a block was not restored. Starting a test while one survives warns before overwriting it (by @mishamyte | PR #1179)
-- Apps: Build tag (**27oct2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
+- Apps: Build tag (**29oct2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
 - OFW: Typos fixed in on-screen text - the Infrared "can't be openned as a remote" error and the updater's "C2 Stach switch failed"
 - OFW: FatFs: apply upstream R0.12c patches, fix 0-byte files in fragmented exFAT directories
