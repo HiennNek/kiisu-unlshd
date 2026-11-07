@@ -1,0 +1,6 @@
+# The repository is LF throughout: git stores LF either way, but without this a
+# contributor with core.autocrlf=true checks out CRLF and any tool that writes a
+# file with LF leaves that one file mixed. eol=lf pins the working tree too.
+* text=auto eol=lf
+
+*.png binary

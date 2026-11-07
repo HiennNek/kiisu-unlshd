@@ -1,0 +1,137 @@
+# Weekly release: build dev (with the prebuilt app packs - that's the ~19MB tgz
+# users flash) and publish it as a GitHub release in the same shape as the
+# existing manual ones (see the release page):
+#   tag "[dd-MM-yyyy] Stable release", assets:
+#     DFU_kiisu-unlshd_<sha8>_<dd-MM-yyyy>.dfu  (full image, flipper-z-f7-full-*.dfu)
+#     kiisu-unlshd_<sha8>_<dd-MM-yyyy>.tgz      (updater package)
+# Runs Fridays 12:00 UTC and via the "Run workflow" button. A cheap check job
+# skips the ~30-minute build when no commits have landed since the last
+# release. A broken dev build simply fails the job, so no release is published.
+
+name: Weekly release
+
+on:
+  schedule:
+    - cron: "0 12 * * 5" # Friday 12:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release + tag
+
+concurrency:
+  group: weekly-release
+  cancel-in-progress: false
+
+env:
+  FBT_NO_SYNC: "0"
+  FORCE_NO_DIRTY: "yes"
+  FBT_GIT_SUBMODULE_SHALLOW: "1"
+
+jobs:
+  check:
+    name: decide
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.c.outputs.release }}
+    steps:
+      # No checkout needed: compare github.sha against the last release's tag
+      # (tags created by `gh release create` are lightweight, so the ref's
+      # object sha IS the commit).
+      - name: Skip if HEAD is already the last release
+        id: c
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>/dev/null || true)"
+          if [ -n "$TAG" ]; then
+            TAG_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" -q .object.sha 2>/dev/null || true)"
+            if [ "$TAG_SHA" = "${{ github.sha }}" ]; then
+              echo "No commits since release ${TAG}; skipping."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: build & publish
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0 # upstream-merge detection walks recent merges
+          clean: "true"
+
+      - name: Compute version vars
+        id: vars
+        run: |
+          SHA8="$(git rev-parse --short=8 HEAD)"
+          DATE="$(date -u +%d-%m-%Y)"
+          {
+            echo "sha8=$SHA8"
+            echo "date=$DATE"
+            echo "suffix=${SHA8}_${DATE}"
+          } >> "$GITHUB_OUTPUT"
+
+      # Unlike pr-build.yml, the app packs under extra_resources are KEPT:
+      # releases ship them.
+      - name: Build firmware
+        env:
+          DIST_SUFFIX: ${{ steps.vars.outputs.suffix }}
+        run: ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+
+      - name: Rename assets (release-page naming)
+        env:
+          SUFFIX: ${{ steps.vars.outputs.suffix }}
+        run: |
+          mv dist/f7-C/flipper-z-f7-update-*.tgz "kiisu-unlshd_${SUFFIX}.tgz"
+          mv dist/f7-C/flipper-z-f7-full-*.dfu "DFU_kiisu-unlshd_${SUFFIX}.dfu"
+
+      - name: Write release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA8: ${{ steps.vars.outputs.sha8 }}
+          DATE: ${{ steps.vars.outputs.date }}
+        run: |
+          # Most recent upstream merge (worded either "... 'upstream' ..." or
+          # "... 'DarkFlippers:dev' ..."): second parent is the upstream tip.
+          UPSTREAM="$(git log --merges -20 --format='%s|%P' \
+            | awk -F'|' 'tolower($1) ~ /darkflippers|upstream/ {split($2,p," "); printf "%.7s", p[2]; exit}')"
+          [ -n "$UPSTREAM" ] || UPSTREAM="unknown"
+          {
+            echo "## Kiisu-UNLSHD \`$SHA8\`"
+            echo ""
+            echo "**Release date:** $DATE (dd-MM-yyyy)"
+            echo "**Upstream Unleashed commit:** \`$UPSTREAM\`"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Changelog"
+            echo "- **Weekly update**"
+            echo "- Pull updates & apps from upstream"
+          } > body.md
+          cat .github/scripts/release_notes_template.md >> body.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATE: ${{ steps.vars.outputs.date }}
+          SUFFIX: ${{ steps.vars.outputs.suffix }}
+        run: |
+          # Re-run on the same day: refresh the assets instead of failing.
+          if gh release view "$DATE" >/dev/null 2>&1; then
+            gh release upload "$DATE" \
+              "kiisu-unlshd_${SUFFIX}.tgz" "DFU_kiisu-unlshd_${SUFFIX}.dfu" --clobber
+          else
+            gh release create "$DATE" \
+              --title "[${DATE}] Stable release" \
+              --target "${{ github.sha }}" \
+              --notes-file body.md \
+              "kiisu-unlshd_${SUFFIX}.tgz" \
+              "DFU_kiisu-unlshd_${SUFFIX}.dfu"
+          fi
