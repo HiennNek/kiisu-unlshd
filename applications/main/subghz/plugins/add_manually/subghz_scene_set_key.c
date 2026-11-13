@@ -18,16 +18,18 @@ void subghz_scene_set_key_on_enter(void* context) {
     uint8_t byte_count = 0;
 
     if(subghz->gen_info->type == GenData) {
-        byte_ptr = (uint8_t*)&subghz->gen_info->data.key;
-        byte_count = sizeof(subghz->gen_info->data.key);
+        // byte_input edits in place, so the key has to be big endian while this scene owns it.
+        subghz->gen_info->data.key = __bswap64(subghz->gen_info->data.key);
+        // The key sits right aligned in the u64, so offering all 8 bytes would expose padding
+        // that no encoder transmits yet still lands in the saved Key field.
+        byte_count = (uint8_t)((subghz->gen_info->data.bits + 7) / 8);
+        byte_ptr = (uint8_t*)&subghz->gen_info->data.key + (sizeof(uint64_t) - byte_count);
     } else {
         furi_crash("Not implemented");
     }
 
     furi_assert(byte_ptr);
     furi_assert(byte_count > 0);
-
-    *((uint64_t*)byte_ptr) = __bswap64(*((uint64_t*)byte_ptr)); // Convert
 
     // Setup view
     ByteInput* byte_input = subghz->byte_input;
@@ -48,23 +50,17 @@ bool subghz_scene_set_key_on_event(void* context, SceneManagerEvent event) {
                 subghz->gen_info->data.key = __bswap64(subghz->gen_info->data.key);
 
                 if(subghz->gen_info->data.te) {
-                    generated_protocol = subghz_txrx_gen_data_protocol_and_te(
-                        subghz->txrx,
-                        subghz->gen_info->mod,
-                        subghz->gen_info->freq,
-                        subghz->gen_info->data.name,
-                        subghz->gen_info->data.key,
-                        subghz->gen_info->data.bits,
-                        subghz->gen_info->data.te);
-                } else {
-                    generated_protocol = subghz_txrx_gen_data_protocol(
-                        subghz->txrx,
-                        subghz->gen_info->mod,
-                        subghz->gen_info->freq,
-                        subghz->gen_info->data.name,
-                        subghz->gen_info->data.key,
-                        subghz->gen_info->data.bits);
+                    // A protocol that carries a Te gets asked for it, and is generated there
+                    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetTe);
+                    return true;
                 }
+                generated_protocol = subghz_txrx_gen_data_protocol(
+                    subghz->txrx,
+                    subghz->gen_info->mod,
+                    subghz->gen_info->freq,
+                    subghz->gen_info->data.name,
+                    subghz->gen_info->data.key,
+                    subghz->gen_info->data.bits);
             }
 
             consumed = true;

@@ -20,6 +20,7 @@ typedef enum {
     GenSecPlus2,
     GenPhoenixV2,
     GenPrastel,
+    GenBelKorn,
 } GenType;
 
 typedef struct {
@@ -31,7 +32,11 @@ typedef struct {
             const char* name;
             uint64_t key;
             uint8_t bits;
+            /* te != 0 means the protocol carries one and Advanced asks for it, within
+               te_min..te_max - the window that protocol's own loader or decoder accepts. */
             uint32_t te;
+            uint16_t te_min;
+            uint16_t te_max;
         } data;
         struct {
             uint32_t serial;
@@ -118,6 +123,13 @@ typedef struct {
             uint8_t btn;
             uint16_t cnt;
         } prastel;
+        struct {
+            uint32_t serial;
+            uint8_t btn;
+            uint16_t cnt;
+            /* Frame bits 12..15: which maker's receiver the remote belongs to */
+            uint8_t model;
+        } belkorn;
     };
 } GenInfo;
 
