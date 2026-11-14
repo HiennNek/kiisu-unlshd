@@ -1,18 +1,16 @@
-# Weekly release: build dev (with the prebuilt app packs - that's the ~19MB tgz
+# Manual release: build dev (with the prebuilt app packs - that's the ~19MB tgz
 # users flash) and publish it as a GitHub release in the same shape as the
 # existing manual ones (see the release page):
 #   tag "[dd-MM-yyyy] Stable release", assets:
 #     DFU_kiisu-unlshd_<sha8>_<dd-MM-yyyy>.dfu  (full image, flipper-z-f7-full-*.dfu)
 #     kiisu-unlshd_<sha8>_<dd-MM-yyyy>.tgz      (updater package)
-# Runs Fridays 12:00 UTC and via the "Run workflow" button. A cheap check job
-# skips the ~30-minute build when no commits have landed since the last
-# release. A broken dev build simply fails the job, so no release is published.
+# Runs only via the "Run workflow" button. A cheap check job skips the
+# ~30-minute build when no commits have landed since the last release. A broken
+# dev build simply fails the job, so no release is published.
 
-name: Weekly release
+name: Manual release
 
 on:
-  schedule:
-    - cron: "0 12 * * 5" # Friday 12:00 UTC
   workflow_dispatch:
 
 permissions:
