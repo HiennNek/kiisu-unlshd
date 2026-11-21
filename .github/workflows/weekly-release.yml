@@ -80,7 +80,7 @@ jobs:
       # releases ship them.
       - name: Build firmware
         env:
-          DIST_SUFFIX: ${{ steps.vars.outputs.suffix }}
+          DIST_SUFFIX: "Kiisu-UNLSHD"
         run: ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
 
       - name: Rename assets (release-page naming)
