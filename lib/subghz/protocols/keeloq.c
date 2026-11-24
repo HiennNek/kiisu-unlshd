@@ -133,10 +133,9 @@ static const KeeloqResyncPack keeloq_resync_packs[] = {
 #define KEELOQ_UPLOAD_FRAME 156u
 
 // Half-rate KeeLoq. The HCS200/HCS300/HCS301 encoders carry a baud-rate-select field, so
-// the very same 66-bit frame also ships at Te=200us instead of the usual 400us.
+// the very same 66-bit frame also ships at Te=200us (KEELOQ_TE_FAST) instead of the usual 400us.
 // Te is locked from the sync gap, which is 10*Te and so unambiguous between the two rates,
 // and every later timing check is scaled by it. Nothing else about the frame changes.
-#define KEELOQ_TE_FAST 200u
 
 // The sync gap is what decides the rate: 10*Te, so 2000us for the half rate against 4000us
 // for the standard one. The half rate is locked only when the gap is unmistakably in its own
@@ -384,6 +383,7 @@ static bool subghz_protocol_keeloq_gen_data(
             klq_last_custom_btn = 0xB;
         } else if(
             (strcmp(instance->manufacture_name, "Novoferm") == 0) ||
+            (strcmp(instance->manufacture_name, "FAAC_FIX") == 0) ||
             (strcmp(instance->manufacture_name, "Stilmatic") == 0)) {
             klq_last_custom_btn = 0x9;
         } else if(
@@ -638,9 +638,11 @@ static bool subghz_protocol_keeloq_gen_data(
                     monarch_disc = KEELOQ_MONARCH_DISCRIMINATOR_A;
                 }
                 decrypt = btn << 28 | (uint32_t)monarch_disc << 16 | instance->generic.cnt;
-            } else if(strcmp(instance->manufacture_name, "Phantom_Hiland") == 0) {
-                // Phantom/Hiland -> 10 bit serial in hop, top 2 disc bits from seed -
-                // normal learning
+            } else if(
+                (strcmp(instance->manufacture_name, "Phantom_Hiland") == 0) ||
+                (strcmp(instance->manufacture_name, "FAAC_FIX") == 0)) {
+                // Phantom/Hiland and FAAC_FIX -> 10 bit serial in hop, top 2 disc bits from
+                // seed - normal learning
                 decrypt = btn << 28 |
                           (uint32_t)subghz_protocol_keeloq_phantom_hiland_disc(
                               instance->generic.serial, instance->generic.seed)
@@ -1504,9 +1506,10 @@ static uint32_t subghz_protocol_keeloq_check_remote_controller_selector(
                             keystore->mfname = *manufacture_name;
                             return decrypt;
                         }
-                    } else if((strcmp(
-                                   furi_string_get_cstr(manufacture_code->name),
-                                   "Phantom_Hiland") == 0)) {
+                    } else if(
+                        (strcmp(furi_string_get_cstr(manufacture_code->name), "Phantom_Hiland") ==
+                         0) ||
+                        (strcmp(furi_string_get_cstr(manufacture_code->name), "FAAC_FIX") == 0)) {
                         if(subghz_protocol_keeloq_check_decrypt_phantom_hiland(
                                instance, decrypt, btn, fix)) {
                             *manufacture_name = furi_string_get_cstr(manufacture_code->name);
@@ -1914,6 +1917,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
        (strcmp(instance->manufacture_name, "Erreka") == 0) ||
        (strcmp(instance->manufacture_name, "Monarch") == 0) ||
        (strcmp(instance->manufacture_name, "Phantom_Hiland") == 0) ||
+       (strcmp(instance->manufacture_name, "FAAC_FIX") == 0) ||
        (strcmp(instance->manufacture_name, "Dea_Mio") == 0)) {
         uint8_t seed_data[sizeof(uint32_t)] = {0};
         for(size_t i = 0; i < sizeof(uint32_t); i++) {
@@ -2188,13 +2192,6 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
     hopdecrypt = subghz_protocol_keeloq_check_remote_controller(
         &instance->generic, instance->keystore, &instance->manufacture_name);
 
-    /* A half-rate frame is a Crypt Key remote: no manufacturer key in the keystore decrypts
-     * one, so the rate it arrived at is the only thing naming it. Display only - the branches
-     * below still switch on the real name, and the counter stays unreadable either way. */
-    const char* mf_display = (subghz_protocol_keeloq_te_nominal(instance->te) == KEELOQ_TE_FAST) ?
-                                 "Crypt Key" :
-                                 instance->manufacture_name;
-
     uint32_t code_found_hi = instance->generic.data >> 32;
     uint32_t code_found_lo = instance->generic.data & 0x00000000ffffffff;
 
@@ -2208,25 +2205,29 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
     subghz_block_generic_global.current_btn = instance->generic.btn;
     subghz_block_generic_global.btn_length_bit = 4;
 
+    const char* bit_suffix =
+        (subghz_protocol_keeloq_te_nominal(instance->te) == KEELOQ_TE_FAST) ? "b HR" : "bit";
+
     if(strcmp(instance->manufacture_name, "AN-Motors") == 0) {
         // No counter only pseudo counter
         subghz_block_generic_global.cnt_is_available = false;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX PsCn:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
             instance->generic.cnt,
             code_found_reverse_lo,
             instance->generic.btn,
-            mf_display);
+            instance->manufacture_name);
     } else if(strcmp(instance->manufacture_name, "HCS101") == 0) {
         // Counter is present but not encrypted
         subghz_block_generic_global.cnt_is_available = true;
@@ -2234,20 +2235,21 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.current_cnt = instance->generic.cnt;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
             instance->generic.cnt,
             code_found_reverse_lo,
             instance->generic.btn,
-            mf_display);
+            instance->manufacture_name);
     } else if(
         (strcmp(instance->manufacture_name, "BFT") == 0) ||
         (strcmp(instance->manufacture_name, "Erreka") == 0)) {
@@ -2260,42 +2262,45 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         if((prog_mode == PROG_MODE_KEELOQ_BFT) || (prog_mode == PROG_MODE_KEELOQ_ERREKA)) {
             furi_string_cat_printf(
                 output,
-                "%s %dbit\r\n"
+                "%s %d%s\r\n"
                 "Key:%08lX%08lX\r\n"
                 "Fix:0x%08lX    Cnt:%04lX\r\n"
                 "Hop:0x%08lX    Btn:%01X\r\n"
                 "MF:%s PRG Sd:%08lX",
                 instance->generic.protocol_name,
                 instance->generic.data_count_bit,
+                bit_suffix,
                 code_found_hi,
                 code_found_lo,
                 code_found_reverse_hi,
                 instance->generic.cnt,
                 code_found_reverse_lo,
                 instance->generic.btn,
-                mf_display,
+                instance->manufacture_name,
                 instance->generic.seed);
         } else {
             furi_string_cat_printf(
                 output,
-                "%s %dbit\r\n"
+                "%s %d%s\r\n"
                 "Key:%08lX%08lX\r\n"
                 "Fix:0x%08lX    Cnt:%04lX\r\n"
                 "Hop:0x%08lX    Btn:%01X\r\n"
                 "MF:%s Sd:%08lX",
                 instance->generic.protocol_name,
                 instance->generic.data_count_bit,
+                bit_suffix,
                 code_found_hi,
                 code_found_lo,
                 code_found_reverse_hi,
                 instance->generic.cnt,
                 hopdecrypt,
                 instance->generic.btn,
-                mf_display,
+                instance->manufacture_name,
                 instance->generic.seed);
         }
     } else if(
         (strcmp(instance->manufacture_name, "Phantom_Hiland") == 0) ||
+        (strcmp(instance->manufacture_name, "FAAC_FIX") == 0) ||
         (strcmp(instance->manufacture_name, "Dea_Mio") == 0)) {
         // Ds: the discriminator, whose top 2 bits are not derivable from the serial
         subghz_block_generic_global.cnt_is_available = true;
@@ -2303,20 +2308,21 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.current_cnt = instance->generic.cnt;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s Ds:%03lX",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
             instance->generic.cnt,
             hopdecrypt,
             instance->generic.btn,
-            mf_display,
+            instance->manufacture_name,
             instance->generic.seed);
     } else if(strcmp(instance->manufacture_name, "Unknown") == 0) {
         // No counter info with unknown MF
@@ -2324,19 +2330,20 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.cnt_is_available = false;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:????\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
             code_found_reverse_lo,
             instance->generic.btn,
-            mf_display);
+            instance->manufacture_name);
     } else {
         // All other known MF with counter info, allow counter edit
         subghz_block_generic_global.cnt_is_available = true;
@@ -2344,19 +2351,20 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.current_cnt = instance->generic.cnt;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
             instance->generic.cnt,
             hopdecrypt,
             instance->generic.btn,
-            mf_display);
+            instance->manufacture_name);
     }
 }
